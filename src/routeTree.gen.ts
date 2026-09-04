@@ -10,6 +10,7 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as ApiTranscribeRouteImport } from './routes/api/transcribe'
 import { Route as CookRecipeIdRouteImport } from './routes/cook.$recipeId'
 import { Route as RecipesIndexRouteImport } from './routes/recipes.index'
 import { Route as RecipesRecipeIdRouteImport } from './routes/recipes.$recipeId'
@@ -17,6 +18,11 @@ import { Route as RecipesRecipeIdRouteImport } from './routes/recipes.$recipeId'
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiTranscribeRoute = ApiTranscribeRouteImport.update({
+  id: '/api/transcribe',
+  path: '/api/transcribe',
   getParentRoute: () => rootRouteImport,
 } as any)
 const CookRecipeIdRoute = CookRecipeIdRouteImport.update({
@@ -37,12 +43,14 @@ const RecipesRecipeIdRoute = RecipesRecipeIdRouteImport.update({
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/api/transcribe': typeof ApiTranscribeRoute
   '/cook/$recipeId': typeof CookRecipeIdRoute
   '/recipes/$recipeId': typeof RecipesRecipeIdRoute
   '/recipes/': typeof RecipesIndexRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/api/transcribe': typeof ApiTranscribeRoute
   '/cook/$recipeId': typeof CookRecipeIdRoute
   '/recipes/$recipeId': typeof RecipesRecipeIdRoute
   '/recipes': typeof RecipesIndexRoute
@@ -50,20 +58,38 @@ export interface FileRoutesByTo {
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/api/transcribe': typeof ApiTranscribeRoute
   '/cook/$recipeId': typeof CookRecipeIdRoute
   '/recipes/$recipeId': typeof RecipesRecipeIdRoute
   '/recipes/': typeof RecipesIndexRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/cook/$recipeId' | '/recipes/$recipeId' | '/recipes/'
+  fullPaths:
+    | '/'
+    | '/api/transcribe'
+    | '/cook/$recipeId'
+    | '/recipes/$recipeId'
+    | '/recipes/'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/cook/$recipeId' | '/recipes/$recipeId' | '/recipes'
-  id: '__root__' | '/' | '/cook/$recipeId' | '/recipes/$recipeId' | '/recipes/'
+  to:
+    | '/'
+    | '/api/transcribe'
+    | '/cook/$recipeId'
+    | '/recipes/$recipeId'
+    | '/recipes'
+  id:
+    | '__root__'
+    | '/'
+    | '/api/transcribe'
+    | '/cook/$recipeId'
+    | '/recipes/$recipeId'
+    | '/recipes/'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  ApiTranscribeRoute: typeof ApiTranscribeRoute
   CookRecipeIdRoute: typeof CookRecipeIdRoute
   RecipesRecipeIdRoute: typeof RecipesRecipeIdRoute
   RecipesIndexRoute: typeof RecipesIndexRoute
@@ -76,6 +102,13 @@ declare module '@tanstack/react-router' {
       path: '/'
       fullPath: '/'
       preLoaderRoute: typeof IndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/transcribe': {
+      id: '/api/transcribe'
+      path: '/api/transcribe'
+      fullPath: '/api/transcribe'
+      preLoaderRoute: typeof ApiTranscribeRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/cook/$recipeId': {
@@ -104,6 +137,7 @@ declare module '@tanstack/react-router' {
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  ApiTranscribeRoute: ApiTranscribeRoute,
   CookRecipeIdRoute: CookRecipeIdRoute,
   RecipesRecipeIdRoute: RecipesRecipeIdRoute,
   RecipesIndexRoute: RecipesIndexRoute,

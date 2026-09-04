@@ -36,7 +36,7 @@ function CookingMode() {
   const navigate = useNavigate();
 
   const total = recipe.steps.length;
-  const step = recipe.steps[index];
+  const step = recipe.steps[index] ?? "";
   const progress = ((index + 1) / total) * 100;
   const last = index === total - 1;
 

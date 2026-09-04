@@ -2,8 +2,10 @@ import { createFileRoute, Link, notFound, useNavigate } from "@tanstack/react-ro
 import { useState } from "react";
 import { ArrowLeft, ChevronLeft, ChevronRight, RotateCcw, Check } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { getRecipe } from "@/lib/recipes";
+import { getRecipe, stepTimerSeconds } from "@/lib/recipes";
 import { speakStep } from "@/lib/speech";
+import { StepTimer } from "@/components/StepTimer";
+import { useVibe } from "@/lib/vibe-store";
 
 export const Route = createFileRoute("/cook/$recipeId")({
   loader: ({ params }) => {
@@ -34,11 +36,13 @@ function CookingMode() {
   const recipe = getRecipe(recipeId)!;
   const [index, setIndex] = useState(0);
   const navigate = useNavigate();
+  const { muted } = useVibe();
 
   const total = recipe.steps.length;
   const step = recipe.steps[index] ?? "";
   const progress = ((index + 1) / total) * 100;
   const last = index === total - 1;
+  const timerSeconds = stepTimerSeconds(step);
 
   return (
     <main className="flex min-h-screen flex-col px-5 pt-24 pb-10 sm:px-8">
@@ -67,10 +71,13 @@ function CookingMode() {
           </div>
         </div>
 
-        <div className="flex flex-1 items-center justify-center py-10">
+        <div className="flex flex-1 flex-col items-center justify-center gap-8 py-10">
           <p className="max-w-2xl text-center text-3xl leading-snug font-medium sm:text-4xl md:text-5xl md:leading-tight">
             {step}
           </p>
+          {timerSeconds !== null && (
+            <StepTimer key={`${index}-${timerSeconds}`} seconds={timerSeconds} soundEnabled={!muted} />
+          )}
         </div>
 
         <div className="grid grid-cols-3 gap-3">

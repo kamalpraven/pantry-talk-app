@@ -365,8 +365,14 @@ export function findRecipes(
   const goalScore = (m: RecipeMatch) =>
     filters.goals.filter((g) => m.recipe.dietaryTags.includes(g)).length;
 
+  // Cookability comes first: a dish you can nearly make beats a slightly
+  // higher-protein dish that needs a shopping trip.
+  const cookability = (m: RecipeMatch) =>
+    m.missing.length === 0 ? 3 : m.missing.length <= 1 ? 2 : m.missing.length <= 2 ? 1 : 0;
+
   return matches.sort((a, b) => {
     if (a.fitsTime !== b.fitsTime) return a.fitsTime ? -1 : 1;
+    if (cookability(b) !== cookability(a)) return cookability(b) - cookability(a);
     if (goalScore(b) !== goalScore(a)) return goalScore(b) - goalScore(a);
     if (filters.goals.includes("High Protein")) {
       const p = b.recipe.nutrition.protein - a.recipe.nutrition.protein;

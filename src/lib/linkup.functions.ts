@@ -298,6 +298,20 @@ export const discoverRecipes = createServerFn({ method: "POST" })
       if (recipes.length < 3) {
         return { recipes, error: "Live recipe search returned too little to work with." };
       }
+
+      // Live search rarely returns photos, so read each recipe page's own preview image.
+      const needsImage = recipes.filter((r) => !r.imageUrl && !r.image && r.sourceUrl);
+      if (needsImage.length) {
+        const { resolveRecipeImages } = await import("./recipe-images.server");
+        const found = await resolveRecipeImages(
+          needsImage.map((r) => r.sourceUrl!).filter(Boolean),
+        );
+        for (const recipe of needsImage) {
+          const image = recipe.sourceUrl ? found[recipe.sourceUrl] : undefined;
+          if (image) recipe.imageUrl = image;
+        }
+      }
+
       return { recipes, error: null };
     } catch (error) {
       console.error("linkup recipe search failed", error);

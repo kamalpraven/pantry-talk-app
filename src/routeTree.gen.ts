@@ -15,6 +15,7 @@ import { Route as ApiTranscribeRouteImport } from './routes/api/transcribe'
 import { Route as CookRecipeIdRouteImport } from './routes/cook.$recipeId'
 import { Route as RecipesIndexRouteImport } from './routes/recipes.index'
 import { Route as RecipesRecipeIdRouteImport } from './routes/recipes.$recipeId'
+import { Route as ApiPublicRecipeImageRouteImport } from './routes/api/public/recipe-image'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
@@ -46,6 +47,11 @@ const RecipesRecipeIdRoute = RecipesRecipeIdRouteImport.update({
   path: '/recipes/$recipeId',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiPublicRecipeImageRoute = ApiPublicRecipeImageRouteImport.update({
+  id: '/api/public/recipe-image',
+  path: '/api/public/recipe-image',
+  getParentRoute: () => rootRouteImport,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -54,6 +60,7 @@ export interface FileRoutesByFullPath {
   '/cook/$recipeId': typeof CookRecipeIdRoute
   '/recipes/$recipeId': typeof RecipesRecipeIdRoute
   '/recipes/': typeof RecipesIndexRoute
+  '/api/public/recipe-image': typeof ApiPublicRecipeImageRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -62,6 +69,7 @@ export interface FileRoutesByTo {
   '/cook/$recipeId': typeof CookRecipeIdRoute
   '/recipes/$recipeId': typeof RecipesRecipeIdRoute
   '/recipes': typeof RecipesIndexRoute
+  '/api/public/recipe-image': typeof ApiPublicRecipeImageRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -71,6 +79,7 @@ export interface FileRoutesById {
   '/cook/$recipeId': typeof CookRecipeIdRoute
   '/recipes/$recipeId': typeof RecipesRecipeIdRoute
   '/recipes/': typeof RecipesIndexRoute
+  '/api/public/recipe-image': typeof ApiPublicRecipeImageRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -81,6 +90,7 @@ export interface FileRouteTypes {
     | '/cook/$recipeId'
     | '/recipes/$recipeId'
     | '/recipes/'
+    | '/api/public/recipe-image'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -89,6 +99,7 @@ export interface FileRouteTypes {
     | '/cook/$recipeId'
     | '/recipes/$recipeId'
     | '/recipes'
+    | '/api/public/recipe-image'
   id:
     | '__root__'
     | '/'
@@ -97,6 +108,7 @@ export interface FileRouteTypes {
     | '/cook/$recipeId'
     | '/recipes/$recipeId'
     | '/recipes/'
+    | '/api/public/recipe-image'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -106,6 +118,7 @@ export interface RootRouteChildren {
   CookRecipeIdRoute: typeof CookRecipeIdRoute
   RecipesRecipeIdRoute: typeof RecipesRecipeIdRoute
   RecipesIndexRoute: typeof RecipesIndexRoute
+  ApiPublicRecipeImageRoute: typeof ApiPublicRecipeImageRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -152,6 +165,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof RecipesRecipeIdRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/public/recipe-image': {
+      id: '/api/public/recipe-image'
+      path: '/api/public/recipe-image'
+      fullPath: '/api/public/recipe-image'
+      preLoaderRoute: typeof ApiPublicRecipeImageRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
@@ -162,6 +182,7 @@ const rootRouteChildren: RootRouteChildren = {
   CookRecipeIdRoute: CookRecipeIdRoute,
   RecipesRecipeIdRoute: RecipesRecipeIdRoute,
   RecipesIndexRoute: RecipesIndexRoute,
+  ApiPublicRecipeImageRoute: ApiPublicRecipeImageRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

@@ -26,9 +26,19 @@ export const Route = createFileRoute("/api/transcribe")({
           return new Response("That recording is too long.", { status: 400 });
         }
 
+        const extensions: Record<string, string> = {
+          "audio/wav": "wav",
+          "audio/x-wav": "wav",
+          "audio/webm": "webm",
+          "audio/mp4": "mp4",
+          "audio/mpeg": "mp3",
+        };
+        const ext = extensions[(audio.type || "audio/wav").split(";")[0] ?? ""] ?? "wav";
+
         const upstream = new FormData();
         upstream.append("model", "openai/gpt-4o-mini-transcribe");
-        upstream.append("file", audio, "recording.wav");
+        upstream.append("file", audio, `recording.${ext}`);
+
 
         const response = await fetch("https://ai.gateway.lovable.dev/v1/audio/transcriptions", {
           method: "POST",

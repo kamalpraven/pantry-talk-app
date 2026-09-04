@@ -32,7 +32,8 @@ function RecipeDetail() {
   const { recipeId } = Route.useParams();
   const { ingredients } = usePantry();
   const recipe = getRecipe(recipeId)!;
-  const { used, missing, matchPercent } = matchRecipe(recipe, ingredients);
+  const { used, missing, matchPercent, substitutions } = matchRecipe(recipe, ingredients);
+
 
   return (
     <main className="pb-20">

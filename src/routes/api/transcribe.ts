@@ -2,11 +2,15 @@ import { createFileRoute } from "@tanstack/react-router";
 
 const MAX_BYTES = 8 * 1024 * 1024;
 
+/**
+ * ElevenLabs Speech-to-Text (Scribe). Used for ingredient input, mood input and
+ * spoken cooking commands. The API key never leaves the server.
+ */
 export const Route = createFileRoute("/api/transcribe")({
   server: {
     handlers: {
       POST: async ({ request }) => {
-        const apiKey = process.env["LOVABLE_API_KEY"];
+        const apiKey = process.env["ELEVENLABS_API_KEY"];
         if (!apiKey) {
           return new Response("Transcription is not configured.", { status: 500 });
         }
@@ -36,13 +40,13 @@ export const Route = createFileRoute("/api/transcribe")({
         const ext = extensions[(audio.type || "audio/wav").split(";")[0] ?? ""] ?? "wav";
 
         const upstream = new FormData();
-        upstream.append("model", "openai/gpt-4o-mini-transcribe");
+        upstream.append("model_id", "scribe_v1");
+        upstream.append("language_code", "eng");
         upstream.append("file", audio, `recording.${ext}`);
 
-
-        const response = await fetch("https://ai.gateway.lovable.dev/v1/audio/transcriptions", {
+        const response = await fetch("https://api.elevenlabs.io/v1/speech-to-text", {
           method: "POST",
-          headers: { Authorization: `Bearer ${apiKey}` },
+          headers: { "xi-api-key": apiKey },
           body: upstream,
         });
 
@@ -52,7 +56,7 @@ export const Route = createFileRoute("/api/transcribe")({
           const message =
             response.status === 429
               ? "Too many requests right now — try again in a moment."
-              : "Could not transcribe that recording.";
+              : "I didn't catch that. Try again.";
           return new Response(message, { status: response.status });
         }
 

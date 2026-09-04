@@ -1,11 +1,10 @@
 /**
- * Speech input.
+ * Voice in and voice out.
  *
- * Recording happens in the browser (Web Audio → WAV) and transcription happens
- * server-side at /api/transcribe, so no key is ever exposed to the client.
+ * Recording happens in the browser (Web Audio → WAV). Transcription runs at
+ * /api/transcribe and narration at /api/speak, both backed by ElevenLabs, so no
+ * API key is ever exposed to the client.
  */
-
-export const MOCK_TRANSCRIPT = "avocado, lemon, eggs, bread, tomatoes, cheddar";
 
 export type Recorder = {
   stop: () => Promise<Blob>;
@@ -95,7 +94,7 @@ export class SpeechError extends Error {}
 
 export async function transcribeAudio(blob: Blob): Promise<string> {
   if (blob.size < 2048) {
-    throw new SpeechError("That recording was empty — please try again.");
+    throw new SpeechError("I didn't catch that. Try again.");
   }
   const body = new FormData();
   body.append("audio", blob, "recording.wav");
@@ -103,11 +102,11 @@ export async function transcribeAudio(blob: Blob): Promise<string> {
   const response = await fetch("/api/transcribe", { method: "POST", body });
   if (!response.ok) {
     const detail = await response.text().catch(() => "");
-    throw new SpeechError(detail || "Could not transcribe that recording.");
+    throw new SpeechError(detail || "I didn't catch that. Try again.");
   }
   const data = (await response.json()) as { text?: string };
   const text = (data.text ?? "").trim();
-  if (!text) throw new SpeechError("I didn't catch anything — please try again.");
+  if (!text) throw new SpeechError("I didn't catch that. Try again.");
   return text;
 }
 
@@ -126,13 +125,68 @@ export function parseIngredients(transcript: string): string[] {
     .filter((part) => part.length > 1);
 }
 
-/**
- * Swap point for ElevenLabs Text-to-Speech narration of a cooking step.
- */
-export function speakStep(text: string) {
-  if (typeof window === "undefined" || !("speechSynthesis" in window)) return;
-  window.speechSynthesis.cancel();
-  const utterance = new SpeechSynthesisUtterance(text);
-  utterance.rate = 0.95;
-  window.speechSynthesis.speak(utterance);
+/* ------------------------------- narration -------------------------------- */
+
+let currentSpeech: HTMLAudioElement | null = null;
+
+export function stopSpeaking() {
+  if (currentSpeech) {
+    currentSpeech.pause();
+    currentSpeech = null;
+  }
+  if (typeof window !== "undefined" && "speechSynthesis" in window) {
+    window.speechSynthesis.cancel();
+  }
 }
+
+function speakWithBrowser(text: string): Promise<void> {
+  return new Promise((resolve) => {
+    if (typeof window === "undefined" || !("speechSynthesis" in window)) return resolve();
+    window.speechSynthesis.cancel();
+    const utterance = new SpeechSynthesisUtterance(text);
+    utterance.rate = 0.95;
+    utterance.onend = () => resolve();
+    utterance.onerror = () => resolve();
+    window.speechSynthesis.speak(utterance);
+  });
+}
+
+/**
+ * Speaks the given text with ElevenLabs and resolves when playback finishes.
+ * Falls back to the browser voice, and finally to silence, so cooking never
+ * stalls when narration fails.
+ */
+export async function speakAloud(text: string): Promise<void> {
+  stopSpeaking();
+  const trimmed = text.trim();
+  if (!trimmed) return;
+
+  let url: string | null = null;
+  try {
+    const response = await fetch("/api/speak", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ text: trimmed }),
+    });
+    if (!response.ok) throw new Error("tts failed");
+    const blob = await response.blob();
+    if (blob.size < 512) throw new Error("empty audio");
+
+    url = URL.createObjectURL(blob);
+    const audio = new Audio(url);
+    currentSpeech = audio;
+    await new Promise<void>((resolve) => {
+      audio.onended = () => resolve();
+      audio.onerror = () => resolve();
+      audio.play().catch(() => resolve());
+    });
+  } catch {
+    await speakWithBrowser(trimmed);
+  } finally {
+    if (url) URL.revokeObjectURL(url);
+    currentSpeech = null;
+  }
+}
+
+/** Legacy alias kept for the manual Repeat control. */
+export const speakStep = speakAloud;

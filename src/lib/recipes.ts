@@ -83,11 +83,14 @@ export function normalize(value: string) {
   return value.trim().toLowerCase().replace(/e?s$/, "");
 }
 
-/** Estimated per serving — not clinical data. Later supplied by Linkup results. */
+/** Estimated per serving — not clinical data. Supplied by Linkup when live. */
 export type Nutrition = {
   calories: number;
   protein: number;
+  carbs?: number;
+  fat?: number;
 };
+
 
 export type Recipe = {
   id: string;
@@ -105,10 +108,15 @@ export type Recipe = {
   essentialIngredients: string[];
   staples: string[];
   steps: string[];
-  /** Reserved for Linkup live discovery. */
+  /** Full ingredient lines with quantities, when a source provides them. */
+  ingredientLines?: string[];
+  /** Remote image from live recipe discovery. */
+  imageUrl?: string;
+  /** Set when the recipe came from live web discovery. */
   sourceUrl?: string;
   sourceName?: string;
 };
+
 
 /** Practical swaps — suggestions, never guaranteed equivalents. */
 export const SUBSTITUTIONS: Record<string, string> = {
@@ -118,7 +126,14 @@ export const SUBSTITUTIONS: Record<string, string> = {
   cheddar: "Any melting cheese, like gouda or mozzarella",
   bread: "A tortilla, pita or bagel",
   onion: "Shallot, leek or spring onion",
-  tomatoe: "Canned chopped tomatoes",
+  tomato: "Canned chopped tomatoes",
+  parsley: "Fresh basil, chives or a pinch of dried oregano",
+  feta: "Crumbled goat cheese, or salted ricotta",
+  "greek yogurt": "Sour cream, or plain yogurt",
+  butter: "Olive oil",
+  milk: "Any plant milk, or a splash of water",
+  spinach: "Any soft leafy green, like kale or chard",
+
   avocado: "Hummus, for a different but creamy spread",
   egg: "Firm tofu, scrambled",
 };
@@ -147,7 +162,7 @@ export const RECIPES: Recipe[] = [
     blurb: "Creamy lemony avocado on toast with a soft egg on top.",
     tags: ["Quick", "Healthy", "Breakfast", "High Protein"],
     dietaryTags: ["High Protein", "Vegetarian", "Dairy Free"],
-    nutrition: { calories: 430, protein: 21 },
+    nutrition: { calories: 430, protein: 21, carbs: 32, fat: 26 },
     keyIngredients: ["Avocado", "Eggs", "Bread", "Lemon", "Tomatoes"],
     essentialIngredients: ["Avocado", "Eggs"],
     staples: ["Salt", "Black pepper", "Olive oil"],
@@ -169,7 +184,7 @@ export const RECIPES: Recipe[] = [
     blurb: "Soft folded omelette with melted cheddar and blistered tomatoes.",
     tags: ["Quick", "High Protein", "Breakfast", "Lunch"],
     dietaryTags: ["High Protein", "Vegetarian", "Low Carb", "Gluten Free"],
-    nutrition: { calories: 390, protein: 28 },
+    nutrition: { calories: 390, protein: 28, carbs: 6, fat: 29 },
     keyIngredients: ["Eggs", "Cheddar", "Tomatoes"],
     essentialIngredients: ["Eggs", "Cheddar"],
     staples: ["Olive oil", "Salt", "Black pepper"],
@@ -191,7 +206,7 @@ export const RECIPES: Recipe[] = [
     blurb: "Cool, creamy egg salad brightened with lemon on toasted bread.",
     tags: ["Lunch", "High Protein"],
     dietaryTags: ["High Protein", "Vegetarian", "Dairy Free"],
-    nutrition: { calories: 480, protein: 22 },
+    nutrition: { calories: 480, protein: 22, carbs: 34, fat: 28 },
     keyIngredients: ["Eggs", "Bread", "Lemon", "Mayonnaise"],
     essentialIngredients: ["Eggs"],
     staples: ["Salt", "Black pepper"],
@@ -212,7 +227,7 @@ export const RECIPES: Recipe[] = [
     blurb: "Eggs poached in a spiced tomato sauce, scooped up with bread.",
     tags: ["Dinner", "High Protein", "Healthy"],
     dietaryTags: ["Vegetarian", "Dairy Free"],
-    nutrition: { calories: 350, protein: 19 },
+    nutrition: { calories: 350, protein: 19, carbs: 22, fat: 20 },
     keyIngredients: ["Tomatoes", "Eggs", "Bread", "Onion"],
     essentialIngredients: ["Tomatoes", "Eggs"],
     staples: ["Olive oil", "Dried spices", "Salt", "Black pepper"],
@@ -234,7 +249,7 @@ export const RECIPES: Recipe[] = [
     blurb: "Grilled cheddar and tomato on toast — the fastest thing you can make.",
     tags: ["Quick", "Breakfast", "Lunch"],
     dietaryTags: ["Vegetarian"],
-    nutrition: { calories: 330, protein: 14 },
+    nutrition: { calories: 330, protein: 14, carbs: 28, fat: 18 },
     keyIngredients: ["Bread", "Tomatoes", "Cheddar"],
     essentialIngredients: ["Bread", "Cheddar"],
     staples: ["Olive oil", "Salt", "Black pepper"],
@@ -314,9 +329,14 @@ function buildReason(
   return `A simple ${recipe.timeMinutes}-minute dish worth keeping in mind.`;
 }
 
-export function findRecipes(pantry: string[], filters: RecipeFilters): RecipeMatch[] {
+export function findRecipes(
+  pantry: string[],
+  filters: RecipeFilters,
+  pool: Recipe[] = RECIPES,
+): RecipeMatch[] {
   const limit = TIME_LIMIT_MINUTES[filters.timeLimit];
-  const base = RECIPES.map((recipe) => matchRecipe(recipe, pantry));
+  const base = pool.map((recipe) => matchRecipe(recipe, pantry));
+
 
   const qualifying = base.filter((m) => m.recipe.timeMinutes <= limit);
   const topProtein = qualifying
@@ -345,8 +365,14 @@ export function findRecipes(pantry: string[], filters: RecipeFilters): RecipeMat
   const goalScore = (m: RecipeMatch) =>
     filters.goals.filter((g) => m.recipe.dietaryTags.includes(g)).length;
 
+  // Cookability comes first: a dish you can nearly make beats a slightly
+  // higher-protein dish that needs a shopping trip.
+  const cookability = (m: RecipeMatch) =>
+    m.missing.length === 0 ? 3 : m.missing.length <= 1 ? 2 : m.missing.length <= 2 ? 1 : 0;
+
   return matches.sort((a, b) => {
     if (a.fitsTime !== b.fitsTime) return a.fitsTime ? -1 : 1;
+    if (cookability(b) !== cookability(a)) return cookability(b) - cookability(a);
     if (goalScore(b) !== goalScore(a)) return goalScore(b) - goalScore(a);
     if (filters.goals.includes("High Protein")) {
       const p = b.recipe.nutrition.protein - a.recipe.nutrition.protein;
@@ -418,6 +444,17 @@ export function formatTimer(seconds: number) {
   const s = seconds % 60;
   return `${m}:${String(s).padStart(2, "0")}`;
 }
+
+/** "3 minutes and 12 seconds" — for spoken answers. */
+export function formatSpokenTime(seconds: number) {
+  const m = Math.floor(seconds / 60);
+  const s = seconds % 60;
+  const parts: string[] = [];
+  if (m) parts.push(`${m} minute${m === 1 ? "" : "s"}`);
+  if (s) parts.push(`${s} second${s === 1 ? "" : "s"}`);
+  return parts.join(" and ") || "no time";
+}
+
 
 export function timerLabel(seconds: number) {
   if (seconds % 60 === 0) {

@@ -56,6 +56,7 @@ function IngredientInput() {
           type="button"
           onClick={handleMic}
           disabled={listening}
+          aria-label="Tell me what you have"
           className={`flex size-32 flex-col items-center justify-center rounded-full bg-primary text-primary-foreground shadow-lift transition-transform hover:scale-[1.03] active:scale-95 disabled:opacity-90 sm:size-36 ${listening ? "mic-listening" : ""}`}
         >
           {listening ? (

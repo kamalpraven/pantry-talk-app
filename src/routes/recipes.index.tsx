@@ -1,8 +1,24 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { ArrowLeft, Clock, CheckCircle2, AlertCircle, Repeat2, Sparkles } from "lucide-react";
+import { useServerFn } from "@tanstack/react-start";
+import { useQuery } from "@tanstack/react-query";
+import { useEffect } from "react";
+import {
+  ArrowLeft,
+  Clock,
+  CheckCircle2,
+  AlertCircle,
+  Repeat2,
+  Sparkles,
+  Loader2,
+  ExternalLink,
+  Globe,
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { RecipeImage } from "@/components/RecipeImage";
 import { usePantry } from "@/lib/pantry-store";
-import { findRecipes, readinessLabel, substituteLabel } from "@/lib/recipes";
+import { findRecipes, readinessLabel, substituteLabel, RECIPES } from "@/lib/recipes";
+import { discoverRecipes } from "@/lib/linkup.functions";
+import { cacheRecipes } from "@/lib/recipe-cache";
 
 export const Route = createFileRoute("/recipes/")({
   head: () => ({
@@ -27,8 +43,25 @@ export const Route = createFileRoute("/recipes/")({
 });
 
 function RecipeResults() {
-  const { ingredients, filters, timeLimit, goals } = usePantry();
-  const matches = findRecipes(ingredients, filters).slice(0, 5);
+  const { ingredients, filters, timeLimit, goals, preference } = usePantry();
+  const search = useServerFn(discoverRecipes);
+
+  const { data, isFetching } = useQuery({
+    queryKey: ["recipes", ingredients, preference, timeLimit, goals],
+    queryFn: () => search({ data: { ingredients, preference, timeLimit, goals } }),
+    enabled: ingredients.length > 0,
+    staleTime: 10 * 60 * 1000,
+    retry: false,
+  });
+
+  const live = data?.recipes ?? [];
+  const usingFallback = live.length === 0;
+  const pool = usingFallback ? RECIPES : live;
+  const matches = findRecipes(ingredients, filters, pool).slice(0, 5);
+
+  useEffect(() => {
+    if (pool.length) cacheRecipes(pool);
+  }, [pool]);
 
   return (
     <main className="mx-auto w-full max-w-3xl px-5 pt-24 pb-20 sm:px-8">
@@ -46,6 +79,26 @@ function RecipeResults() {
         {goals.length ? `, ${goals.join(", ").toLowerCase()}` : ""}.
       </p>
 
+      {isFetching && (
+        <p className="mt-6 flex items-center gap-2 text-base font-medium text-primary" role="status">
+          <Loader2 className="size-5 animate-spin" aria-hidden />
+          Searching the web for recipes that fit your kitchen…
+        </p>
+      )}
+
+      {!isFetching && usingFallback && ingredients.length > 0 && (
+        <p className="mt-6 rounded-2xl bg-secondary p-4 text-base text-muted-foreground" role="status">
+          Live recipe search is unavailable, so here are some suggestions based on your ingredients.
+        </p>
+      )}
+
+      {!isFetching && !usingFallback && (
+        <p className="mt-6 flex items-center gap-2 text-sm font-semibold text-primary">
+          <Globe className="size-4" aria-hidden />
+          Found live on the web just now
+        </p>
+      )}
+
       <ul className="mt-8 space-y-8">
         {matches.map(({ recipe, used, missing, matchPercent, substitutions, labels, reason }) => {
           const ready = missing.length === 0;
@@ -54,16 +107,12 @@ function RecipeResults() {
               key={recipe.id}
               className="overflow-hidden rounded-3xl border border-border bg-card shadow-card transition-shadow hover:shadow-lift"
             >
-              <img
-                src={recipe.image}
-                alt={recipe.name}
-                width={1200}
-                height={900}
-                loading="lazy"
-                className="aspect-[4/3] w-full object-cover sm:aspect-[16/9]"
-              />
+              <RecipeImage recipe={recipe} className="aspect-[4/3] w-full sm:aspect-[16/9]" />
               <div className="p-5 sm:p-7">
                 <h2 className="text-2xl sm:text-3xl">{recipe.name}</h2>
+                {recipe.sourceName && (
+                  <p className="mt-1 text-sm text-muted-foreground">from {recipe.sourceName}</p>
+                )}
 
                 <p className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1 text-base font-medium">
                   <span className="inline-flex items-center gap-1.5">
@@ -150,11 +199,28 @@ function RecipeResults() {
                     Cook this
                   </Link>
                 </Button>
+                {recipe.sourceUrl && (
+                  <a
+                    href={recipe.sourceUrl}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="mt-3 inline-flex w-full items-center justify-center gap-1.5 text-sm font-semibold text-primary"
+                  >
+                    <ExternalLink className="size-4" aria-hidden />
+                    View source
+                  </a>
+                )}
               </div>
             </li>
           );
         })}
       </ul>
+
+      {!isFetching && matches.length === 0 && (
+        <p className="mt-8 text-base text-muted-foreground">
+          Add a few ingredients and I&rsquo;ll find something to cook.
+        </p>
+      )}
     </main>
   );
 }

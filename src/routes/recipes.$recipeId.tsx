@@ -1,4 +1,4 @@
-import { createFileRoute, Link } from "@tanstack/react-router";
+import { createFileRoute, Link, useHydrated } from "@tanstack/react-router";
 import { ArrowLeft, Clock, Users, Sparkles, Repeat2, Flame, ExternalLink } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { RecipeImage } from "@/components/RecipeImage";
@@ -32,9 +32,11 @@ export const Route = createFileRoute("/recipes/$recipeId")({
 function RecipeDetail() {
   const { recipeId } = Route.useParams();
   const { ingredients } = usePantry();
-  const recipe = lookupRecipe(recipeId);
+  const hydrated = useHydrated();
+  const recipe = hydrated ? lookupRecipe(recipeId) : undefined;
 
   if (!recipe) {
+    if (!hydrated) return <main className="min-h-screen" />;
     return (
       <main className="mx-auto w-full max-w-3xl px-5 pt-28 pb-20 sm:px-8">
         <h1 className="text-3xl">That recipe isn&rsquo;t loaded</h1>

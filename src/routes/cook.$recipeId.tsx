@@ -1,4 +1,4 @@
-import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
+import { createFileRoute, Link, useHydrated, useNavigate } from "@tanstack/react-router";
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
   ArrowLeft,
@@ -15,7 +15,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { StepTimer } from "@/components/StepTimer";
 import { lookupRecipe } from "@/lib/recipe-cache";
-import { stepTimerSeconds } from "@/lib/recipes";
+import { formatSpokenTime, stepTimerSeconds } from "@/lib/recipes";
 import { speakAloud, startRecording, stopSpeaking, transcribeAudio, type Recorder } from "@/lib/speech";
 import { answerFor, parseCommand } from "@/lib/voice-commands";
 import { playChime, useCookingTimer } from "@/lib/use-cooking-timer";
@@ -47,7 +47,8 @@ type MicPhase = "idle" | "listening" | "working";
 
 function CookingMode() {
   const { recipeId } = Route.useParams();
-  const recipe = lookupRecipe(recipeId);
+  const hydrated = useHydrated();
+  const recipe = hydrated ? lookupRecipe(recipeId) : undefined;
   const navigate = useNavigate();
   const { muted, duck, unduck } = useVibe();
 
@@ -125,7 +126,7 @@ function CookingMode() {
             return;
           }
           t.start(seconds);
-          await speak(`Timer started for ${Math.round(seconds / 60) || 1} ${seconds < 60 ? "seconds" : Math.round(seconds / 60) === 1 ? "minute" : "minutes"}.`);
+          await speak(`Timer started for ${formatSpokenTime(seconds)}.`);
           return;
         }
         case "pauseTimer":
@@ -196,6 +197,7 @@ function CookingMode() {
   }, [handsFree, speaking, micPhase, toggleMic]);
 
   if (!recipe) {
+    if (!hydrated) return <main className="min-h-screen" />;
     return (
       <main className="mx-auto w-full max-w-3xl px-5 pt-28 pb-20 sm:px-8">
         <h1 className="text-3xl">That recipe isn&rsquo;t loaded</h1>

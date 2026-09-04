@@ -1,8 +1,9 @@
 import { createFileRoute, Link, notFound } from "@tanstack/react-router";
-import { ArrowLeft, Clock, Users, Sparkles } from "lucide-react";
+import { ArrowLeft, Clock, Users, Sparkles, Repeat2, Flame } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { usePantry } from "@/lib/pantry-store";
 import { getRecipe, matchRecipe, readinessLabel } from "@/lib/recipes";
+
 
 export const Route = createFileRoute("/recipes/$recipeId")({
   loader: ({ params }) => {

@@ -201,7 +201,7 @@ function normaliseRecipe(raw: RawRecipe, salt: number): Recipe | null {
     id: slugify(name, salt),
     name,
     image: /^https:\/\//.test(imageUrl) ? imageUrl : "",
-    imageUrl: /^https:\/\//.test(imageUrl) ? imageUrl : undefined,
+    ...(/^https:\/\//.test(imageUrl) ? { imageUrl } : {}),
     timeMinutes,
     servings: Math.max(1, Math.min(8, Math.round(Number(raw["servings"]) || 2))),
     blurb,

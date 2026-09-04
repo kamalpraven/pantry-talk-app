@@ -64,11 +64,52 @@ function RecipeDetail() {
               <Users className="size-4 text-primary" aria-hidden />
               Serves {recipe.servings}
             </span>
+            <span className="inline-flex items-center gap-2 font-medium">
+              <Flame className="size-4 text-primary" aria-hidden />
+              ~{recipe.nutrition.calories} kcal · {recipe.nutrition.protein}g protein
+            </span>
             <span className="inline-flex items-center gap-2 font-semibold text-primary">
               <Sparkles className="size-4" aria-hidden />
               {matchPercent}% pantry match
             </span>
           </div>
+          <p className="mt-2 text-sm text-muted-foreground">
+            Calories and protein are estimates per serving.
+          </p>
+
+          {recipe.dietaryTags.length > 0 && (
+            <ul className="mt-4 flex flex-wrap gap-2">
+              {recipe.dietaryTags.map((tag) => (
+                <li
+                  key={tag}
+                  className="rounded-full border border-primary/30 px-3 py-1.5 text-sm font-semibold text-primary"
+                >
+                  {tag}
+                </li>
+              ))}
+            </ul>
+          )}
+
+          {substitutions.length > 0 && (
+            <section className="mt-6 rounded-2xl bg-secondary p-4">
+              <h2 className="flex items-center gap-2 text-base font-semibold">
+                <Repeat2 className="size-4 text-primary" aria-hidden />
+                Easy substitutes
+              </h2>
+              <ul className="mt-3 space-y-2 text-base">
+                {substitutions.map((sub) => (
+                  <li key={sub.missing}>
+                    <span className="font-semibold">{sub.missing}</span>
+                    <span className="text-muted-foreground"> → {sub.suggestion}</span>
+                  </li>
+                ))}
+              </ul>
+              <p className="mt-3 text-sm text-muted-foreground">
+                Suggestions only — the result will taste a little different.
+              </p>
+            </section>
+          )}
+
 
           <div className="mt-8 grid gap-6 sm:grid-cols-2">
             <section>

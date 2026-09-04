@@ -1,51 +1,59 @@
-import { createFileRoute, Link, notFound } from "@tanstack/react-router";
-import { ArrowLeft, Clock, Users, Sparkles, Repeat2, Flame } from "lucide-react";
+import { createFileRoute, Link } from "@tanstack/react-router";
+import { ArrowLeft, Clock, Users, Sparkles, Repeat2, Flame, ExternalLink } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { RecipeImage } from "@/components/RecipeImage";
+import { GroceryFinder } from "@/components/GroceryFinder";
 import { usePantry } from "@/lib/pantry-store";
-import { getRecipe, matchRecipe, readinessLabel } from "@/lib/recipes";
-
+import { matchRecipe, readinessLabel } from "@/lib/recipes";
+import { lookupRecipe } from "@/lib/recipe-cache";
 
 export const Route = createFileRoute("/recipes/$recipeId")({
-  loader: ({ params }) => {
-    const recipe = getRecipe(params.recipeId);
-    if (!recipe) throw notFound();
-    return { name: recipe.name, blurb: recipe.blurb };
-  },
-  head: ({ loaderData }) => {
-    if (!loaderData) {
-      return { meta: [{ title: "Recipe not found — PantryTalk" }, { name: "robots", content: "noindex" }] };
-    }
-    const title = `${loaderData.name} — PantryTalk`;
-    return {
-      meta: [
-        { title },
-        { name: "description", content: loaderData.blurb },
-        { property: "og:title", content: title },
-        { property: "og:description", content: loaderData.blurb },
-      ],
-    };
-  },
+  head: () => ({
+    meta: [
+      { title: "Recipe — PantryTalk" },
+      {
+        name: "description",
+        content:
+          "Ingredients, estimated macros, substitutions and step-by-step instructions for the dish you picked.",
+      },
+      { property: "og:title", content: "Recipe — PantryTalk" },
+      {
+        property: "og:description",
+        content:
+          "Ingredients, estimated macros, substitutions and step-by-step instructions for the dish you picked.",
+      },
+      { property: "og:type", content: "article" },
+      { name: "twitter:card", content: "summary_large_image" },
+    ],
+  }),
   component: RecipeDetail,
 });
 
 function RecipeDetail() {
   const { recipeId } = Route.useParams();
   const { ingredients } = usePantry();
-  const recipe = getRecipe(recipeId)!;
-  const { used, missing, matchPercent, substitutions } = matchRecipe(recipe, ingredients);
+  const recipe = lookupRecipe(recipeId);
 
+  if (!recipe) {
+    return (
+      <main className="mx-auto w-full max-w-3xl px-5 pt-28 pb-20 sm:px-8">
+        <h1 className="text-3xl">That recipe isn&rsquo;t loaded</h1>
+        <p className="mt-3 text-base text-muted-foreground">
+          Head back to your matches and pick a dish again.
+        </p>
+        <Button asChild className="mt-6 h-14 rounded-full px-6 text-base">
+          <Link to="/recipes">Back to recipes</Link>
+        </Button>
+      </main>
+    );
+  }
+
+  const { used, missing, matchPercent, substitutions } = matchRecipe(recipe, ingredients);
+  const { calories, protein, carbs, fat } = recipe.nutrition;
 
   return (
     <main className="pb-20">
-      <div className="relative">
-        <img
-          src={recipe.image}
-          alt={recipe.name}
-          width={1200}
-          height={900}
-          className="h-[42vh] max-h-[420px] w-full object-cover sm:h-[52vh]"
-        />
-      </div>
+      <RecipeImage recipe={recipe} className="h-[42vh] max-h-[420px] w-full sm:h-[52vh]" />
 
       <div className="mx-auto -mt-10 w-full max-w-3xl px-5 sm:px-8">
         <div className="rounded-3xl border border-border bg-card p-6 shadow-lift sm:p-9">
@@ -54,6 +62,17 @@ function RecipeDetail() {
           </span>
           <h1 className="mt-4 text-3xl sm:text-4xl">{recipe.name}</h1>
           <p className="mt-2 text-base text-muted-foreground">{recipe.blurb}</p>
+          {recipe.sourceUrl && (
+            <a
+              href={recipe.sourceUrl}
+              target="_blank"
+              rel="noreferrer"
+              className="mt-2 inline-flex items-center gap-1.5 text-sm font-semibold text-primary"
+            >
+              <ExternalLink className="size-4" aria-hidden />
+              View source{recipe.sourceName ? ` · ${recipe.sourceName}` : ""}
+            </a>
+          )}
 
           <div className="mt-5 flex flex-wrap gap-x-6 gap-y-2 text-base">
             <span className="inline-flex items-center gap-2 font-medium">
@@ -64,18 +83,26 @@ function RecipeDetail() {
               <Users className="size-4 text-primary" aria-hidden />
               Serves {recipe.servings}
             </span>
-            <span className="inline-flex items-center gap-2 font-medium">
-              <Flame className="size-4 text-primary" aria-hidden />
-              ~{recipe.nutrition.calories} kcal · {recipe.nutrition.protein}g protein
-            </span>
             <span className="inline-flex items-center gap-2 font-semibold text-primary">
               <Sparkles className="size-4" aria-hidden />
               {matchPercent}% pantry match
             </span>
           </div>
-          <p className="mt-2 text-sm text-muted-foreground">
-            Calories and protein are estimates per serving.
-          </p>
+
+          <section className="mt-5 rounded-2xl bg-secondary p-4">
+            <h2 className="flex items-center gap-2 text-base font-semibold">
+              <Flame className="size-4 text-primary" aria-hidden />
+              Estimated nutrition per serving
+            </h2>
+            <p className="mt-2 text-base">
+              {calories} kcal · {protein}g protein
+              {carbs !== undefined ? ` · ${carbs}g carbs` : ""}
+              {fat !== undefined ? ` · ${fat}g fat` : ""}
+            </p>
+            <p className="mt-2 text-sm text-muted-foreground">
+              Estimates only — not laboratory measurements.
+            </p>
+          </section>
 
           {recipe.dietaryTags.length > 0 && (
             <ul className="mt-4 flex flex-wrap gap-2">
@@ -110,6 +137,7 @@ function RecipeDetail() {
             </section>
           )}
 
+          {missing.length > 0 && <GroceryFinder missing={missing} />}
 
           <div className="mt-8 grid gap-6 sm:grid-cols-2">
             <section>
@@ -133,6 +161,16 @@ function RecipeDetail() {
                 <h2 className="text-lg">You&rsquo;ll need</h2>
                 <ul className="mt-3 space-y-1.5 text-base text-muted-foreground">
                   {missing.map((item) => (
+                    <li key={item}>{item}</li>
+                  ))}
+                </ul>
+              </section>
+            )}
+            {recipe.ingredientLines && recipe.ingredientLines.length > 0 && (
+              <section className="sm:col-span-2">
+                <h2 className="text-lg">Full ingredient list</h2>
+                <ul className="mt-3 space-y-1.5 text-base text-muted-foreground">
+                  {recipe.ingredientLines.map((item) => (
                     <li key={item}>{item}</li>
                   ))}
                 </ul>

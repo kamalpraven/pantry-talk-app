@@ -110,7 +110,7 @@ function RecipeResults() {
           return (
             <li
               key={recipe.id}
-              className="overflow-hidden rounded-3xl border border-border bg-card shadow-card transition-shadow hover:shadow-lift"
+              className="group overflow-hidden rounded-3xl border border-border bg-card shadow-card transition-all duration-300 hover:-translate-y-0.5 hover:shadow-lift"
             >
               <RecipeImage recipe={recipe} className="aspect-[4/3] w-full sm:aspect-[16/9]" />
               <div className="p-5 sm:p-7">

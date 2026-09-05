@@ -112,7 +112,10 @@ function RecipeResults() {
               key={recipe.id}
               className="group overflow-hidden rounded-3xl border border-border bg-card shadow-card transition-all duration-300 hover:-translate-y-0.5 hover:shadow-lift"
             >
-              <RecipeImage recipe={recipe} className="aspect-[4/3] w-full sm:aspect-[16/9]" />
+              <RecipeImage
+                recipe={recipe}
+                className="aspect-[4/3] w-full transition-transform duration-500 group-hover:scale-[1.03] sm:aspect-[16/9]"
+              />
               <div className="p-5 sm:p-7">
                 <h2 className="text-2xl sm:text-3xl">{recipe.name}</h2>
                 {recipe.sourceName && (

@@ -82,9 +82,12 @@ function RecipeResults() {
       </p>
 
       {isFetching && (
-        <p className="mt-6 flex items-center gap-2 text-base font-medium text-primary" role="status">
-          <Loader2 className="size-5 animate-spin" aria-hidden />
-          Searching the web for recipes that fit your kitchen…
+        <p
+          className="mt-6 flex items-center gap-2 rounded-2xl bg-gradient-to-r from-secondary to-accent p-4 text-base font-medium text-primary"
+          role="status"
+        >
+          <Loader2 className="size-5 shrink-0 animate-spin" aria-hidden />
+          Here are quick ideas now — still looking online for even better matches…
         </p>
       )}
 

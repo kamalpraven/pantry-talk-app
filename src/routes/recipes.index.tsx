@@ -56,6 +56,8 @@ function RecipeResults() {
 
   const live = data?.recipes ?? [];
   const usingFallback = live.length === 0;
+  // Show good matches from the built-in dishes straight away, then swap in
+  // the live web results the moment they arrive.
   const pool = usingFallback ? RECIPES : live;
   const matches = findRecipes(ingredients, filters, pool).slice(0, 5);
 

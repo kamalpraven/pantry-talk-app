@@ -56,6 +56,8 @@ function RecipeResults() {
 
   const live = data?.recipes ?? [];
   const usingFallback = live.length === 0;
+  // Show good matches from the built-in dishes straight away, then swap in
+  // the live web results the moment they arrive.
   const pool = usingFallback ? RECIPES : live;
   const matches = findRecipes(ingredients, filters, pool).slice(0, 5);
 
@@ -80,9 +82,12 @@ function RecipeResults() {
       </p>
 
       {isFetching && (
-        <p className="mt-6 flex items-center gap-2 text-base font-medium text-primary" role="status">
-          <Loader2 className="size-5 animate-spin" aria-hidden />
-          Searching the web for recipes that fit your kitchen…
+        <p
+          className="mt-6 flex items-center gap-2 rounded-2xl bg-gradient-to-r from-secondary to-accent p-4 text-base font-medium text-primary"
+          role="status"
+        >
+          <Loader2 className="size-5 shrink-0 animate-spin" aria-hidden />
+          Here are quick ideas now — still looking online for even better matches…
         </p>
       )}
 
@@ -105,9 +110,12 @@ function RecipeResults() {
           return (
             <li
               key={recipe.id}
-              className="overflow-hidden rounded-3xl border border-border bg-card shadow-card transition-shadow hover:shadow-lift"
+              className="group overflow-hidden rounded-3xl border border-border bg-card shadow-card transition-all duration-300 hover:-translate-y-0.5 hover:shadow-lift"
             >
-              <RecipeImage recipe={recipe} className="aspect-[4/3] w-full sm:aspect-[16/9]" />
+              <RecipeImage
+                recipe={recipe}
+                className="aspect-[4/3] w-full transition-transform duration-500 group-hover:scale-[1.03] sm:aspect-[16/9]"
+              />
               <div className="p-5 sm:p-7">
                 <h2 className="text-2xl sm:text-3xl">{recipe.name}</h2>
                 {recipe.sourceName && (

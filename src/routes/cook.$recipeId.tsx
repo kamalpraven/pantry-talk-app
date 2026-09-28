@@ -13,6 +13,8 @@ import {
   Ear,
   Sparkles,
   Minus,
+  Star,
+  Plus,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -32,8 +34,14 @@ import { useVibe } from "@/lib/vibe-store";
 import { usePantry, type ConsumptionEstimate } from "@/lib/pantry-store";
 import { formatPantryQuantity } from "@/lib/inventory";
 import { trackEvent } from "@/lib/analytics";
+import { FavoriteButton } from "@/components/FavoriteButton";
+import { useCookingHistory } from "@/lib/cooking-history-store";
+import { lookupRecipeWithSnapshot } from "@/lib/recipe-snapshots";
 
 export const Route = createFileRoute("/cook/$recipeId")({
+  validateSearch: (search: Record<string, unknown>) => ({
+    again: typeof search.again === "string" ? search.again : undefined,
+  }),
   head: () => ({
     meta: [
       { title: "Cooking mode — PantryTalk" },
@@ -59,8 +67,14 @@ type MicPhase = "idle" | "listening" | "working";
 
 function CookingMode() {
   const { recipeId } = Route.useParams();
+  const { again } = Route.useSearch();
   const hydrated = useHydrated();
-  const recipe = hydrated ? lookupRecipe(recipeId) : undefined;
+  const history = useCookingHistory();
+  const previousSession = again ? history.sessionById(again) : undefined;
+  const recipe = hydrated
+    ? (lookupRecipeWithSnapshot(recipeId, previousSession?.recipeSnapshot) ??
+      lookupRecipe(recipeId))
+    : undefined;
   const navigate = useNavigate();
   const { muted, duck, unduck } = useVibe();
   const { pantryItems, previewConsumption, applyConsumption } = usePantry();
@@ -74,6 +88,13 @@ function CookingMode() {
   const [completionOpen, setCompletionOpen] = useState(false);
   const [completionUpdated, setCompletionUpdated] = useState(false);
   const [consumptionDraft, setConsumptionDraft] = useState<ConsumptionEstimate[]>([]);
+  const [sessionId, setSessionId] = useState<string | null>(null);
+  const [rating, setRating] = useState<number | null>(null);
+  const [wouldCookAgain, setWouldCookAgain] = useState<"yes" | "maybe" | "no" | null>(null);
+  const [notes, setNotes] = useState("");
+  const [substitutions, setSubstitutions] = useState([
+    { originalIngredient: "", replacementIngredient: "" },
+  ]);
   const recorderRef = useRef<Recorder | null>(null);
   const spokenStep = useRef<number | null>(null);
 
@@ -81,6 +102,19 @@ function CookingMode() {
   const step = recipe?.steps[index] ?? "";
   const stepSeconds = step ? stepTimerSeconds(step) : null;
   const last = total > 0 && index === total - 1;
+
+  useEffect(() => {
+    if (!recipe || sessionId) return;
+    void history
+      .startCooking(recipe, {
+        forceNew: Boolean(again),
+        servings: previousSession?.servings ?? recipe.servings,
+        cookedAgain: Boolean(again),
+      })
+      .then((session) => setSessionId(session.id));
+  }, [again, history, previousSession?.servings, recipe, sessionId]);
+
+  const previousSubs = previousSession ? history.substitutionsFor(previousSession.id) : [];
 
   /* --------------------------------- voice --------------------------------- */
 
@@ -223,7 +257,22 @@ function CookingMode() {
     setCompletionOpen(true);
   }
 
-  function confirmConsumption() {
+  async function markSessionComplete(extra?: {
+    rating?: number | null;
+    wouldCookAgain?: "yes" | "maybe" | "no" | null;
+    notes?: string | null;
+    substitutions?: { originalIngredient: string; replacementIngredient: string }[];
+  }) {
+    if (!sessionId) return;
+    await history.completeSession(sessionId, {
+      rating: extra?.rating ?? null,
+      wouldCookAgain: extra?.wouldCookAgain ?? null,
+      notes: extra?.notes ?? null,
+      substitutions: extra?.substitutions ?? [],
+    });
+  }
+
+  async function confirmConsumption() {
     if (!recipe) return;
     const confirmed = consumptionDraft.filter((item) => item.quantity > 0);
     applyConsumption(recipe, confirmed);
@@ -231,8 +280,26 @@ function CookingMode() {
       recipeId: recipe.id,
       updatedIngredients: confirmed.length,
     });
+    await markSessionComplete();
     setCompletionUpdated(true);
     void speak("Kitchen updated. Your next meal recommendations are already smarter.");
+  }
+
+  async function skipInventoryUpdate() {
+    await markSessionComplete();
+    navigate({ to: "/recipes" });
+  }
+
+  async function saveFeedback() {
+    await markSessionComplete({
+      rating,
+      wouldCookAgain,
+      notes,
+      substitutions: substitutions.filter(
+        (item) => item.originalIngredient.trim() && item.replacementIngredient.trim(),
+      ),
+    });
+    navigate({ to: "/history" });
   }
 
   if (!recipe) {
@@ -325,14 +392,14 @@ function CookingMode() {
                 )}
 
                 <Button
-                  onClick={confirmConsumption}
+                  onClick={() => void confirmConsumption()}
                   className="mt-6 h-14 w-full rounded-full text-base font-semibold"
                 >
                   Looks right — update my kitchen
                 </Button>
                 <Button
                   variant="ghost"
-                  onClick={() => navigate({ to: "/recipes" })}
+                  onClick={() => void skipInventoryUpdate()}
                   className="mt-2 h-12 w-full rounded-full"
                 >
                   Skip update
@@ -353,7 +420,121 @@ function CookingMode() {
               </div>
 
               <section className="mt-8 rounded-3xl border border-primary/20 bg-card p-5 shadow-card sm:p-7">
-                <h2 className="text-xl">What&rsquo;s left</h2>
+                <h2 className="text-xl">How was it?</h2>
+                <p className="mt-2 text-sm text-muted-foreground">
+                  Optional — this helps PantryTalk remember what you loved.
+                </p>
+                <div className="mt-4 flex gap-2">
+                  {[1, 2, 3, 4, 5].map((value) => (
+                    <button
+                      key={value}
+                      type="button"
+                      onClick={() => setRating(value)}
+                      aria-label={`Rate ${value} out of 5`}
+                      className={`flex size-10 items-center justify-center rounded-full border ${
+                        rating != null && value <= rating
+                          ? "border-primary bg-primary text-primary-foreground"
+                          : "border-border bg-secondary"
+                      }`}
+                    >
+                      <Star className="size-4" aria-hidden />
+                    </button>
+                  ))}
+                </div>
+                <div className="mt-4 flex flex-wrap gap-2">
+                  {[
+                    ["yes", "Yes"],
+                    ["maybe", "Maybe"],
+                    ["no", "No"],
+                  ].map(([value, label]) => (
+                    <button
+                      key={value}
+                      type="button"
+                      onClick={() => setWouldCookAgain(value as "yes" | "maybe" | "no")}
+                      className={`rounded-full border px-4 py-2 text-sm font-semibold ${
+                        wouldCookAgain === value
+                          ? "border-primary bg-primary text-primary-foreground"
+                          : "border-border bg-secondary"
+                      }`}
+                    >
+                      Cook again? {label}
+                    </button>
+                  ))}
+                </div>
+                <textarea
+                  value={notes}
+                  onChange={(event) => setNotes(event.target.value)}
+                  placeholder="Notes, tweaks, or what you changed"
+                  className="mt-4 min-h-24 w-full rounded-2xl border border-border bg-background p-3 text-sm"
+                />
+                <div className="mt-4 space-y-2">
+                  <p className="text-sm font-semibold">Substitutions</p>
+                  {previousSubs.length > 0 && (
+                    <p className="text-xs text-muted-foreground">
+                      Last time:{" "}
+                      {previousSubs
+                        .map((sub) => `${sub.originalIngredient} → ${sub.replacementIngredient}`)
+                        .join(" · ")}
+                    </p>
+                  )}
+                  {substitutions.map((substitution, substitutionIndex) => (
+                    <div key={substitutionIndex} className="grid gap-2 sm:grid-cols-2">
+                      <Input
+                        value={substitution.originalIngredient}
+                        onChange={(event) =>
+                          setSubstitutions((current) =>
+                            current.map((item, index) =>
+                              index === substitutionIndex
+                                ? { ...item, originalIngredient: event.target.value }
+                                : item,
+                            ),
+                          )
+                        }
+                        placeholder="Original ingredient"
+                      />
+                      <Input
+                        value={substitution.replacementIngredient}
+                        onChange={(event) =>
+                          setSubstitutions((current) =>
+                            current.map((item, index) =>
+                              index === substitutionIndex
+                                ? { ...item, replacementIngredient: event.target.value }
+                                : item,
+                            ),
+                          )
+                        }
+                        placeholder="Replacement"
+                      />
+                    </div>
+                  ))}
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() =>
+                      setSubstitutions((current) => [
+                        ...current,
+                        { originalIngredient: "", replacementIngredient: "" },
+                      ])
+                    }
+                    className="rounded-full"
+                  >
+                    <Plus className="size-4" aria-hidden /> Add substitution
+                  </Button>
+                </div>
+                <div className="mt-4 grid gap-2 sm:grid-cols-2">
+                  <Button onClick={() => void saveFeedback()} className="rounded-full">
+                    Save feedback
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    onClick={() => navigate({ to: "/recipes" })}
+                    className="rounded-full"
+                  >
+                    Skip feedback
+                  </Button>
+                </div>
+
+                <h2 className="mt-8 text-xl">What&rsquo;s left</h2>
                 <ul className="mt-4 grid gap-3 sm:grid-cols-2">
                   {consumptionDraft.map((used) => {
                     const remaining = pantryItems.find((item) => item.id === used.pantryItemId);
@@ -416,8 +597,9 @@ function CookingMode() {
         </Link>
 
         <div className="mt-6">
-          <div className="flex items-baseline justify-between">
+          <div className="flex items-baseline justify-between gap-3">
             <p className="text-lg font-semibold">{recipe.name}</p>
+            <FavoriteButton recipe={recipe} compact className="h-10 rounded-full px-3" />
             <p className="text-base font-medium text-muted-foreground">
               Step {index + 1} of {total}
             </p>

@@ -15,6 +15,8 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { usePantry } from "@/lib/pantry-store";
+import { useFavorites } from "@/lib/favorites-store";
+import { useCookingHistory } from "@/lib/cooking-history-store";
 import { formatPantryQuantity, type ScannedPantryItem } from "@/lib/inventory";
 import { ASSUMED_STAPLES, DIET_GOALS, MEAL_PREFERENCES, TIME_LIMITS } from "@/lib/recipes";
 import { parseIngredients, startRecording, transcribeAudio, type Recorder } from "@/lib/speech";
@@ -61,7 +63,16 @@ function IngredientInput() {
     pantryItems,
     loadDemoKitchen,
     loadScannedKitchen,
+    syncStatus,
+    syncError,
+    retryPantrySync,
+    migrationAvailable,
+    saveGuestKitchenToAccount,
+    dismissGuestKitchenMigration,
   } = usePantry();
+
+  const favorites = useFavorites();
+  const history = useCookingHistory();
 
   const [manual, setManual] = useState("");
   const [ingredientPhase, setIngredientPhase] = useState<Phase>("idle");
@@ -163,7 +174,65 @@ function IngredientInput() {
         <p className="mx-auto mt-4 max-w-md text-base text-muted-foreground sm:text-lg">
           Tell me what ingredients you have, and I&rsquo;ll find something worth cooking.
         </p>
+        <div className="mx-auto mt-4 flex max-w-md flex-col items-center gap-2">
+          <span className="rounded-full bg-secondary px-3 py-1 text-xs font-semibold text-secondary-foreground">
+            {syncStatus === "saved"
+              ? "Kitchen saved"
+              : syncStatus === "syncing"
+                ? "Saving kitchen…"
+                : syncStatus === "loading"
+                  ? "Loading kitchen…"
+                  : syncStatus === "error"
+                    ? "Kitchen usable — sync needs retry"
+                    : "Guest kitchen saved on this device"}
+          </span>
+          {syncError && (
+            <button
+              type="button"
+              onClick={() => void retryPantrySync()}
+              className="text-sm font-semibold text-primary underline underline-offset-4"
+            >
+              {syncError} Retry
+            </button>
+          )}
+        </div>
       </header>
+
+      {(migrationAvailable || favorites.migrationAvailable || history.migrationAvailable) && (
+        <section className="mt-8 rounded-3xl border border-primary/25 bg-card p-5 shadow-card">
+          <p className="text-lg font-semibold">Save your PantryTalk activity?</p>
+          <p className="mt-2 text-sm text-muted-foreground">
+            This account can keep your kitchen, saved recipes, and recent cooking sessions without
+            duplicating matching items.
+          </p>
+          <div className="mt-4 flex flex-wrap gap-3">
+            <Button
+              type="button"
+              onClick={async () => {
+                if (migrationAvailable) await saveGuestKitchenToAccount();
+                if (favorites.migrationAvailable) await favorites.migrateGuestFavorites();
+                if (history.migrationAvailable) await history.migrateGuestHistory();
+              }}
+              className="rounded-full"
+              disabled={syncStatus === "syncing"}
+            >
+              Save to account
+            </Button>
+            <Button
+              type="button"
+              variant="ghost"
+              onClick={() => {
+                dismissGuestKitchenMigration();
+                favorites.dismissMigration();
+                history.dismissMigration();
+              }}
+              className="rounded-full"
+            >
+              Not now
+            </Button>
+          </div>
+        </section>
+      )}
 
       <div className="mt-12 flex flex-col items-center">
         <button

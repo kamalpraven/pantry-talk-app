@@ -21,9 +21,17 @@ export function ProfileMenu() {
 
   if (!user) {
     return (
-      <Button asChild variant="secondary" className="h-10 rounded-full px-4 shadow-card">
-        <Link to="/login">Sign in</Link>
-      </Button>
+      <div className="flex items-center gap-2">
+        <Button asChild variant="secondary" className="h-10 rounded-full px-3 shadow-card">
+          <Link to="/saved">Saved</Link>
+        </Button>
+        <Button asChild variant="secondary" className="h-10 rounded-full px-3 shadow-card">
+          <Link to="/history">History</Link>
+        </Button>
+        <Button asChild variant="secondary" className="h-10 rounded-full px-4 shadow-card">
+          <Link to="/login">Sign in</Link>
+        </Button>
+      </div>
     );
   }
 
@@ -43,10 +51,16 @@ export function ProfileMenu() {
         <DropdownMenuLabel className="truncate">{user.email}</DropdownMenuLabel>
         <DropdownMenuSeparator />
         <DropdownMenuItem asChild>
-          <Link to="/account">Account</Link>
+          <Link to="/">Kitchen</Link>
         </DropdownMenuItem>
         <DropdownMenuItem asChild>
-          <Link to="/">Kitchen</Link>
+          <Link to="/saved">Saved</Link>
+        </DropdownMenuItem>
+        <DropdownMenuItem asChild>
+          <Link to="/history">History</Link>
+        </DropdownMenuItem>
+        <DropdownMenuItem asChild>
+          <Link to="/account">Account</Link>
         </DropdownMenuItem>
         <DropdownMenuSeparator />
         <DropdownMenuItem

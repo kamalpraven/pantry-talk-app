@@ -8,7 +8,14 @@ export type PantryEventName =
   | "cook_mode_started"
   | "meal_completed"
   | "inventory_update_confirmed"
-  | "music_started";
+  | "music_started"
+  | "recipe_saved"
+  | "recipe_unsaved"
+  | "cook_started"
+  | "cook_completed"
+  | "recipe_rated"
+  | "cook_again_started"
+  | "collection_created";
 
 type PantryEvent = {
   name: PantryEventName;

@@ -1,4 +1,13 @@
-import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type ReactNode,
+} from "react";
 import type { DietGoal, MealPreference, Recipe, RecipeFilters, TimeLimit } from "./recipes";
 import {
   applyConsumption as deductConsumption,
@@ -11,8 +20,23 @@ import {
   type PantryItem,
   type ScannedPantryItem,
 } from "./inventory";
+import { useAuth } from "./auth-store";
+import { getSupabaseBrowserClient } from "./supabase";
+import {
+  clearGuestKitchen,
+  emptyKitchen,
+  readAccountKitchenCache,
+  readGuestKitchen,
+  writeAccountKitchenCache,
+  writeGuestKitchen,
+  type PersistedKitchen,
+} from "./pantry-persistence";
+import { hasKitchenItems, mergeGuestIntoAccount, mergePantryItems } from "./pantry-merge";
+import { SupabasePantryRepository } from "./pantry-repository";
 
 export type { ConsumptionEstimate, InventoryEvent, PantryItem } from "./inventory";
+
+export type PantrySyncStatus = "loading" | "guest" | "saved" | "syncing" | "error";
 
 type PantryState = {
   ingredients: string[];
@@ -22,9 +46,13 @@ type PantryState = {
   timeLimit: TimeLimit;
   goals: DietGoal[];
   filters: RecipeFilters;
+  syncStatus: PantrySyncStatus;
+  syncError: string | null;
+  migrationAvailable: boolean;
   addIngredient: (value: string) => void;
   removeIngredient: (value: string) => void;
   setIngredients: (values: string[]) => void;
+  clearPantry: () => void;
   setPreference: (value: MealPreference) => void;
   setTimeLimit: (value: TimeLimit) => void;
   toggleGoal: (value: DietGoal) => void;
@@ -33,69 +61,185 @@ type PantryState = {
   loadScannedKitchen: (items: ScannedPantryItem[]) => void;
   previewConsumption: (recipe: Recipe) => ConsumptionEstimate[];
   applyConsumption: (recipe: Recipe, estimates: ConsumptionEstimate[]) => void;
+  saveGuestKitchenToAccount: () => Promise<void>;
+  dismissGuestKitchenMigration: () => void;
+  retryPantrySync: () => Promise<void>;
 };
 
 const PantryContext = createContext<PantryState | null>(null);
-const STORAGE_KEY = "pantrytalk:state";
 
 function eventId() {
   return `evt-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
 }
 
+function nowIso() {
+  return new Date().toISOString();
+}
+
+function kitchenSnapshot(
+  pantryItems: PantryItem[],
+  inventoryEvents: InventoryEvent[],
+  preference: MealPreference,
+  timeLimit: TimeLimit,
+  goals: DietGoal[],
+): Omit<PersistedKitchen, "version" | "savedAt"> {
+  return { pantryItems, inventoryEvents, preference, timeLimit, goals };
+}
+
+function errMessage(error: unknown) {
+  return error instanceof Error
+    ? error.message
+    : "Kitchen sync failed. You can keep cooking and retry.";
+}
+
 export function PantryProvider({ children }: { children: ReactNode }) {
+  const auth = useAuth();
+  const userId = auth.user?.id ?? null;
   const [pantryItems, setPantryItems] = useState<PantryItem[]>([]);
   const [inventoryEvents, setInventoryEvents] = useState<InventoryEvent[]>([]);
-  const [preference, setPreference] = useState<MealPreference>("Anything");
-  const [timeLimit, setTimeLimit] = useState<TimeLimit>("No rush");
-  const [goals, setGoals] = useState<DietGoal[]>([]);
-  const [loaded, setLoaded] = useState(false);
+  const [preference, setPreferenceState] = useState<MealPreference>("Anything");
+  const [timeLimit, setTimeLimitState] = useState<TimeLimit>("No rush");
+  const [goals, setGoalsState] = useState<DietGoal[]>([]);
+  const [syncStatus, setSyncStatus] = useState<PantrySyncStatus>("loading");
+  const [syncError, setSyncError] = useState<string | null>(null);
+  const [pendingGuestKitchen, setPendingGuestKitchen] = useState<PersistedKitchen | null>(null);
+  const pantryRef = useRef<PantryItem[]>([]);
 
   useEffect(() => {
-    try {
-      const raw = localStorage.getItem(STORAGE_KEY);
-      if (raw) {
-        const parsed = JSON.parse(raw) as Partial<{
-          pantryItems: PantryItem[];
-          inventoryEvents: InventoryEvent[];
-          ingredients: string[];
-          preference: MealPreference;
-          timeLimit: TimeLimit;
-          goals: DietGoal[];
-        }>;
+    pantryRef.current = pantryItems;
+  }, [pantryItems]);
 
-        if (parsed.pantryItems?.length) {
-          setPantryItems(parsed.pantryItems);
-        } else if (parsed.ingredients?.length) {
-          setPantryItems(parsed.ingredients.map((name) => defaultPantryItem(name, "manual")));
-        }
-        if (parsed.inventoryEvents?.length) setInventoryEvents(parsed.inventoryEvents);
-        if (parsed.preference) setPreference(parsed.preference);
-        if (parsed.timeLimit) setTimeLimit(parsed.timeLimit);
-        if (parsed.goals?.length) setGoals(parsed.goals);
+  const persistLocal = useCallback(
+    (
+      items: PantryItem[],
+      events = inventoryEvents,
+      pref = preference,
+      limit = timeLimit,
+      nextGoals = goals,
+    ) => {
+      const snapshot = kitchenSnapshot(items, events, pref, limit, nextGoals);
+      if (userId) writeAccountKitchenCache(userId, snapshot);
+      else writeGuestKitchen(snapshot);
+    },
+    [goals, inventoryEvents, preference, timeLimit, userId],
+  );
+
+  const syncAccountItems = useCallback(
+    async (items: PantryItem[]) => {
+      if (!userId) return;
+      const supabase = getSupabaseBrowserClient();
+      if (!supabase) return;
+      setSyncStatus("syncing");
+      setSyncError(null);
+      try {
+        const repo = new SupabasePantryRepository(supabase, userId);
+        const saved = await repo.replaceAll(mergePantryItems(items));
+        setPantryItems(saved);
+        pantryRef.current = saved;
+        writeAccountKitchenCache(
+          userId,
+          kitchenSnapshot(saved, inventoryEvents, preference, timeLimit, goals),
+        );
+        setSyncStatus("saved");
+      } catch (error) {
+        setSyncError(errMessage(error));
+        setSyncStatus("error");
       }
-    } catch {
-      // ignore malformed storage
-    } finally {
-      setLoaded(true);
+    },
+    [goals, inventoryEvents, preference, timeLimit, userId],
+  );
+
+  const setAndPersistItems = useCallback(
+    (updater: (current: PantryItem[]) => PantryItem[]) => {
+      setPantryItems((current) => {
+        const next = mergePantryItems(updater(current)).map((item) => ({
+          ...item,
+          updatedAt: item.updatedAt ?? nowIso(),
+        }));
+        pantryRef.current = next;
+        persistLocal(next);
+        if (userId) void syncAccountItems(next);
+        else setSyncStatus("guest");
+        return next;
+      });
+    },
+    [persistLocal, syncAccountItems, userId],
+  );
+
+  const hydrateAccount = useCallback(async (id: string) => {
+    const cache = readAccountKitchenCache(id);
+    setPantryItems(cache.pantryItems);
+    pantryRef.current = cache.pantryItems;
+    setInventoryEvents(cache.inventoryEvents);
+    setPreferenceState(cache.preference);
+    setTimeLimitState(cache.timeLimit);
+    setGoalsState(cache.goals);
+    setSyncStatus("loading");
+    setSyncError(null);
+
+    const guest = readGuestKitchen();
+    setPendingGuestKitchen(hasKitchenItems(guest.pantryItems) ? guest : null);
+
+    const supabase = getSupabaseBrowserClient();
+    if (!supabase) {
+      setSyncStatus("error");
+      setSyncError("Supabase is not configured. Using this device's account cache.");
+      return;
+    }
+
+    try {
+      const repo = new SupabasePantryRepository(supabase, id);
+      const rows = await repo.list();
+      setPantryItems(rows);
+      pantryRef.current = rows;
+      writeAccountKitchenCache(
+        id,
+        kitchenSnapshot(
+          rows,
+          cache.inventoryEvents,
+          cache.preference,
+          cache.timeLimit,
+          cache.goals,
+        ),
+      );
+      setSyncStatus("saved");
+    } catch (error) {
+      setSyncStatus("error");
+      setSyncError(errMessage(error));
     }
   }, []);
 
   useEffect(() => {
-    if (!loaded) return;
-    try {
-      localStorage.setItem(
-        STORAGE_KEY,
-        JSON.stringify({ pantryItems, inventoryEvents, preference, timeLimit, goals, version: 2 }),
-      );
-    } catch {
-      // storage unavailable
+    if (auth.loading) return;
+    if (!userId) {
+      const guest = readGuestKitchen();
+      setPantryItems(guest.pantryItems);
+      pantryRef.current = guest.pantryItems;
+      setInventoryEvents(guest.inventoryEvents);
+      setPreferenceState(guest.preference);
+      setTimeLimitState(guest.timeLimit);
+      setGoalsState(guest.goals);
+      setPendingGuestKitchen(null);
+      setSyncError(null);
+      setSyncStatus("guest");
+      return;
     }
-  }, [pantryItems, inventoryEvents, preference, timeLimit, goals, loaded]);
+    void hydrateAccount(userId);
+  }, [auth.loading, hydrateAccount, userId]);
+
+  useEffect(() => {
+    if (auth.loading) return;
+    persistLocal(pantryItems, inventoryEvents, preference, timeLimit, goals);
+  }, [auth.loading, goals, inventoryEvents, pantryItems, persistLocal, preference, timeLimit]);
 
   const ingredients = useMemo(
     () => pantryItems.filter((item) => item.quantityEstimate > 0).map((item) => item.name),
     [pantryItems],
   );
+
+  const addInventoryEvents = useCallback((events: InventoryEvent[]) => {
+    setInventoryEvents((prev) => [...prev, ...events]);
+  }, []);
 
   const value = useMemo<PantryState>(
     () => ({
@@ -106,38 +250,42 @@ export function PantryProvider({ children }: { children: ReactNode }) {
       timeLimit,
       goals,
       filters: { preference, timeLimit, goals },
-      setPreference,
-      setTimeLimit,
-      setGoals,
+      syncStatus,
+      syncError,
+      migrationAvailable: Boolean(
+        userId && pendingGuestKitchen && hasKitchenItems(pendingGuestKitchen.pantryItems),
+      ),
+      setPreference: (next: MealPreference) => setPreferenceState(next),
+      setTimeLimit: (next: TimeLimit) => setTimeLimitState(next),
+      setGoals: (next: DietGoal[]) => setGoalsState(next),
       toggleGoal: (goal: DietGoal) =>
-        setGoals((prev) =>
+        setGoalsState((prev) =>
           prev.includes(goal) ? prev.filter((g) => g !== goal) : [...prev, goal],
         ),
       setIngredients: (values: string[]) => {
         const clean = values.map((value) => value.trim()).filter(Boolean);
-        setPantryItems((prev) =>
+        setAndPersistItems((prev) =>
           clean.map((name) => {
             const existing = prev.find((item) => item.name.toLowerCase() === name.toLowerCase());
-            return existing ?? defaultPantryItem(name, "voice");
+            return existing
+              ? { ...existing, updatedAt: nowIso() }
+              : defaultPantryItem(name, "voice");
           }),
         );
       },
       addIngredient: (raw: string) => {
         const item = raw.trim();
         if (!item) return;
-        setPantryItems((prev) =>
-          prev.some((p) => p.name.toLowerCase() === item.toLowerCase())
-            ? prev
-            : [...prev, defaultPantryItem(item, "manual")],
-        );
+        setAndPersistItems((prev) => [...prev, defaultPantryItem(item, "manual")]);
       },
       removeIngredient: (item: string) =>
-        setPantryItems((prev) => prev.filter((p) => p.name !== item)),
+        setAndPersistItems((prev) => prev.filter((p) => p.name !== item)),
+      clearPantry: () => setAndPersistItems(() => []),
       loadDemoKitchen: () => {
-        const next = DEMO_PANTRY.map((item) => ({ ...item }));
-        setPantryItems(next);
-        setInventoryEvents(
-          next.map((item) => ({
+        const stamped = DEMO_PANTRY.map((item) => ({ ...item, updatedAt: nowIso() }));
+        setAndPersistItems((prev) => [...prev, ...stamped]);
+        addInventoryEvents(
+          stamped.map((item) => ({
             id: eventId(),
             pantryItemId: item.id,
             pantryItemName: item.name,
@@ -151,16 +299,10 @@ export function PantryProvider({ children }: { children: ReactNode }) {
         );
       },
       loadScannedKitchen: (items: ScannedPantryItem[]) => {
-        const next = items
-          .map(scannedPantryItem)
-          .filter(
-            (item, index, all) =>
-              all.findIndex(
-                (candidate) => candidate.name.toLowerCase() === item.name.toLowerCase(),
-              ) === index,
-          );
-        setPantryItems(next);
-        setInventoryEvents(
+        const scanned = items.map(scannedPantryItem);
+        const next = mergePantryItems(scanned);
+        setAndPersistItems((prev) => [...prev, ...next]);
+        addInventoryEvents(
           next.map((item) => ({
             id: eventId(),
             pantryItemId: item.id,
@@ -176,11 +318,10 @@ export function PantryProvider({ children }: { children: ReactNode }) {
       },
       previewConsumption: (recipe: Recipe) => estimateRecipeConsumption(recipe, pantryItems),
       applyConsumption: (recipe: Recipe, estimates: ConsumptionEstimate[]) => {
-        setPantryItems((prev) => deductConsumption(prev, estimates));
+        setAndPersistItems((prev) => deductConsumption(prev, estimates));
         const now = new Date().toISOString();
-        setInventoryEvents((prev) => [
-          ...prev,
-          ...estimates.map((estimate) => ({
+        addInventoryEvents(
+          estimates.map((estimate) => ({
             id: eventId(),
             pantryItemId: estimate.pantryItemId,
             pantryItemName: estimate.name,
@@ -192,10 +333,62 @@ export function PantryProvider({ children }: { children: ReactNode }) {
             recipeId: recipe.id,
             createdAt: now,
           })),
-        ]);
+        );
+      },
+      saveGuestKitchenToAccount: async () => {
+        if (!userId || !pendingGuestKitchen) return;
+        const merged = mergeGuestIntoAccount(pantryRef.current, pendingGuestKitchen.pantryItems);
+        setPantryItems(merged);
+        pantryRef.current = merged;
+        writeAccountKitchenCache(
+          userId,
+          kitchenSnapshot(merged, inventoryEvents, preference, timeLimit, goals),
+        );
+        const supabase = getSupabaseBrowserClient();
+        if (!supabase) {
+          setSyncStatus("error");
+          setSyncError("Supabase is not configured. Guest kitchen was not cleared.");
+          return;
+        }
+        setSyncStatus("syncing");
+        try {
+          const repo = new SupabasePantryRepository(supabase, userId);
+          const saved = await repo.replaceAll(merged);
+          setPantryItems(saved);
+          pantryRef.current = saved;
+          clearGuestKitchen();
+          setPendingGuestKitchen(null);
+          writeAccountKitchenCache(
+            userId,
+            kitchenSnapshot(saved, inventoryEvents, preference, timeLimit, goals),
+          );
+          setSyncStatus("saved");
+          setSyncError(null);
+        } catch (error) {
+          setSyncStatus("error");
+          setSyncError(errMessage(error));
+        }
+      },
+      dismissGuestKitchenMigration: () => setPendingGuestKitchen(null),
+      retryPantrySync: async () => {
+        if (userId) await syncAccountItems(pantryRef.current);
       },
     }),
-    [ingredients, pantryItems, inventoryEvents, preference, timeLimit, goals],
+    [
+      addInventoryEvents,
+      goals,
+      ingredients,
+      inventoryEvents,
+      pantryItems,
+      pendingGuestKitchen,
+      preference,
+      setAndPersistItems,
+      syncAccountItems,
+      syncError,
+      syncStatus,
+      timeLimit,
+      userId,
+    ],
   );
 
   return <PantryContext.Provider value={value}>{children}</PantryContext.Provider>;

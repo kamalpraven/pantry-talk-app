@@ -14,6 +14,8 @@ import { reportLovableError } from "../lib/lovable-error-reporting";
 import { PantryProvider } from "@/lib/pantry-store";
 import { VibeProvider } from "@/lib/vibe-store";
 import { AuthProvider } from "@/lib/auth-store";
+import { FavoritesProvider } from "@/lib/favorites-store";
+import { CookingHistoryProvider } from "@/lib/cooking-history-store";
 import { CookingVibe } from "@/components/CookingVibe";
 import { ProfileMenu } from "@/components/ProfileMenu";
 
@@ -140,16 +142,20 @@ function RootComponent() {
     <QueryClientProvider client={queryClient}>
       <AuthProvider>
         <VibeProvider>
-          <PantryProvider>
-            <div className="fixed top-3 left-3 z-50 sm:top-5 sm:left-5">
-              <CookingVibe />
-            </div>
-            <div className="fixed top-3 right-3 z-50 sm:top-5 sm:right-5">
-              <ProfileMenu />
-            </div>
-            {/* Required: nested routes render here. Removing <Outlet /> breaks all child routes. */}
-            <Outlet />
-          </PantryProvider>
+          <FavoritesProvider>
+            <CookingHistoryProvider>
+              <PantryProvider>
+                <div className="fixed top-3 left-3 z-50 sm:top-5 sm:left-5">
+                  <CookingVibe />
+                </div>
+                <div className="fixed top-3 right-3 z-50 sm:top-5 sm:right-5">
+                  <ProfileMenu />
+                </div>
+                {/* Required: nested routes render here. Removing <Outlet /> breaks all child routes. */}
+                <Outlet />
+              </PantryProvider>
+            </CookingHistoryProvider>
+          </FavoritesProvider>
         </VibeProvider>
       </AuthProvider>
     </QueryClientProvider>

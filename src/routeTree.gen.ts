@@ -12,13 +12,16 @@ import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as AccountRouteImport } from './routes/account'
 import { Route as ForgotPasswordRouteImport } from './routes/forgot-password'
+import { Route as HistoryRouteImport } from './routes/history'
 import { Route as LoginRouteImport } from './routes/login'
 import { Route as ResetPasswordRouteImport } from './routes/reset-password'
+import { Route as SavedRouteImport } from './routes/saved'
 import { Route as SignupRouteImport } from './routes/signup'
 import { Route as ApiScanPantryRouteImport } from './routes/api/scan-pantry'
 import { Route as ApiSpeakRouteImport } from './routes/api/speak'
 import { Route as ApiTranscribeRouteImport } from './routes/api/transcribe'
 import { Route as CookRecipeIdRouteImport } from './routes/cook.$recipeId'
+import { Route as HistorySessionIdRouteImport } from './routes/history.$sessionId'
 import { Route as RecipesIndexRouteImport } from './routes/recipes.index'
 import { Route as RecipesRecipeIdRouteImport } from './routes/recipes.$recipeId'
 import { Route as ApiPublicRecipeImageRouteImport } from './routes/api/public/recipe-image'
@@ -38,6 +41,11 @@ const ForgotPasswordRoute = ForgotPasswordRouteImport.update({
   path: '/forgot-password',
   getParentRoute: () => rootRouteImport,
 } as any)
+const HistoryRoute = HistoryRouteImport.update({
+  id: '/history',
+  path: '/history',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const LoginRoute = LoginRouteImport.update({
   id: '/login',
   path: '/login',
@@ -46,6 +54,11 @@ const LoginRoute = LoginRouteImport.update({
 const ResetPasswordRoute = ResetPasswordRouteImport.update({
   id: '/reset-password',
   path: '/reset-password',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const SavedRoute = SavedRouteImport.update({
+  id: '/saved',
+  path: '/saved',
   getParentRoute: () => rootRouteImport,
 } as any)
 const SignupRoute = SignupRouteImport.update({
@@ -73,6 +86,11 @@ const CookRecipeIdRoute = CookRecipeIdRouteImport.update({
   path: '/cook/$recipeId',
   getParentRoute: () => rootRouteImport,
 } as any)
+const HistorySessionIdRoute = HistorySessionIdRouteImport.update({
+  id: '/$sessionId',
+  path: '/$sessionId',
+  getParentRoute: () => HistoryRoute,
+} as any)
 const RecipesIndexRoute = RecipesIndexRouteImport.update({
   id: '/recipes/',
   path: '/recipes/',
@@ -93,13 +111,16 @@ export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/account': typeof AccountRoute
   '/forgot-password': typeof ForgotPasswordRoute
+  '/history': typeof HistoryRouteWithChildren
   '/login': typeof LoginRoute
   '/reset-password': typeof ResetPasswordRoute
+  '/saved': typeof SavedRoute
   '/signup': typeof SignupRoute
   '/api/scan-pantry': typeof ApiScanPantryRoute
   '/api/speak': typeof ApiSpeakRoute
   '/api/transcribe': typeof ApiTranscribeRoute
   '/cook/$recipeId': typeof CookRecipeIdRoute
+  '/history/$sessionId': typeof HistorySessionIdRoute
   '/recipes/$recipeId': typeof RecipesRecipeIdRoute
   '/recipes/': typeof RecipesIndexRoute
   '/api/public/recipe-image': typeof ApiPublicRecipeImageRoute
@@ -108,13 +129,16 @@ export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/account': typeof AccountRoute
   '/forgot-password': typeof ForgotPasswordRoute
+  '/history': typeof HistoryRouteWithChildren
   '/login': typeof LoginRoute
   '/reset-password': typeof ResetPasswordRoute
+  '/saved': typeof SavedRoute
   '/signup': typeof SignupRoute
   '/api/scan-pantry': typeof ApiScanPantryRoute
   '/api/speak': typeof ApiSpeakRoute
   '/api/transcribe': typeof ApiTranscribeRoute
   '/cook/$recipeId': typeof CookRecipeIdRoute
+  '/history/$sessionId': typeof HistorySessionIdRoute
   '/recipes/$recipeId': typeof RecipesRecipeIdRoute
   '/recipes': typeof RecipesIndexRoute
   '/api/public/recipe-image': typeof ApiPublicRecipeImageRoute
@@ -124,13 +148,16 @@ export interface FileRoutesById {
   '/': typeof IndexRoute
   '/account': typeof AccountRoute
   '/forgot-password': typeof ForgotPasswordRoute
+  '/history': typeof HistoryRouteWithChildren
   '/login': typeof LoginRoute
   '/reset-password': typeof ResetPasswordRoute
+  '/saved': typeof SavedRoute
   '/signup': typeof SignupRoute
   '/api/scan-pantry': typeof ApiScanPantryRoute
   '/api/speak': typeof ApiSpeakRoute
   '/api/transcribe': typeof ApiTranscribeRoute
   '/cook/$recipeId': typeof CookRecipeIdRoute
+  '/history/$sessionId': typeof HistorySessionIdRoute
   '/recipes/$recipeId': typeof RecipesRecipeIdRoute
   '/recipes/': typeof RecipesIndexRoute
   '/api/public/recipe-image': typeof ApiPublicRecipeImageRoute
@@ -141,13 +168,16 @@ export interface FileRouteTypes {
     | '/'
     | '/account'
     | '/forgot-password'
+    | '/history'
     | '/login'
     | '/reset-password'
+    | '/saved'
     | '/signup'
     | '/api/scan-pantry'
     | '/api/speak'
     | '/api/transcribe'
     | '/cook/$recipeId'
+    | '/history/$sessionId'
     | '/recipes/$recipeId'
     | '/recipes/'
     | '/api/public/recipe-image'
@@ -156,13 +186,16 @@ export interface FileRouteTypes {
     | '/'
     | '/account'
     | '/forgot-password'
+    | '/history'
     | '/login'
     | '/reset-password'
+    | '/saved'
     | '/signup'
     | '/api/scan-pantry'
     | '/api/speak'
     | '/api/transcribe'
     | '/cook/$recipeId'
+    | '/history/$sessionId'
     | '/recipes/$recipeId'
     | '/recipes'
     | '/api/public/recipe-image'
@@ -171,13 +204,16 @@ export interface FileRouteTypes {
     | '/'
     | '/account'
     | '/forgot-password'
+    | '/history'
     | '/login'
     | '/reset-password'
+    | '/saved'
     | '/signup'
     | '/api/scan-pantry'
     | '/api/speak'
     | '/api/transcribe'
     | '/cook/$recipeId'
+    | '/history/$sessionId'
     | '/recipes/$recipeId'
     | '/recipes/'
     | '/api/public/recipe-image'
@@ -187,8 +223,10 @@ export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AccountRoute: typeof AccountRoute
   ForgotPasswordRoute: typeof ForgotPasswordRoute
+  HistoryRoute: typeof HistoryRouteWithChildren
   LoginRoute: typeof LoginRoute
   ResetPasswordRoute: typeof ResetPasswordRoute
+  SavedRoute: typeof SavedRoute
   SignupRoute: typeof SignupRoute
   ApiScanPantryRoute: typeof ApiScanPantryRoute
   ApiSpeakRoute: typeof ApiSpeakRoute
@@ -222,6 +260,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ForgotPasswordRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/history': {
+      id: '/history'
+      path: '/history'
+      fullPath: '/history'
+      preLoaderRoute: typeof HistoryRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/login': {
       id: '/login'
       path: '/login'
@@ -234,6 +279,13 @@ declare module '@tanstack/react-router' {
       path: '/reset-password'
       fullPath: '/reset-password'
       preLoaderRoute: typeof ResetPasswordRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/saved': {
+      id: '/saved'
+      path: '/saved'
+      fullPath: '/saved'
+      preLoaderRoute: typeof SavedRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/signup': {
@@ -271,6 +323,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof CookRecipeIdRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/history/$sessionId': {
+      id: '/history/$sessionId'
+      path: '/$sessionId'
+      fullPath: '/history/$sessionId'
+      preLoaderRoute: typeof HistorySessionIdRouteImport
+      parentRoute: typeof HistoryRoute
+    }
     '/recipes/': {
       id: '/recipes/'
       path: '/recipes'
@@ -295,12 +354,25 @@ declare module '@tanstack/react-router' {
   }
 }
 
+interface HistoryRouteChildren {
+  HistorySessionIdRoute: typeof HistorySessionIdRoute
+}
+
+const HistoryRouteChildren: HistoryRouteChildren = {
+  HistorySessionIdRoute: HistorySessionIdRoute,
+}
+
+const HistoryRouteWithChildren =
+  HistoryRoute._addFileChildren(HistoryRouteChildren)
+
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AccountRoute: AccountRoute,
   ForgotPasswordRoute: ForgotPasswordRoute,
+  HistoryRoute: HistoryRouteWithChildren,
   LoginRoute: LoginRoute,
   ResetPasswordRoute: ResetPasswordRoute,
+  SavedRoute: SavedRoute,
   SignupRoute: SignupRoute,
   ApiScanPantryRoute: ApiScanPantryRoute,
   ApiSpeakRoute: ApiSpeakRoute,

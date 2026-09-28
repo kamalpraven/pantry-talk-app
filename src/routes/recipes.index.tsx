@@ -15,6 +15,7 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { RecipeImage } from "@/components/RecipeImage";
+import { FavoriteButton } from "@/components/FavoriteButton";
 import { usePantry } from "@/lib/pantry-store";
 import { findRecipes, normalize, readinessLabel, substituteLabel, RECIPES } from "@/lib/recipes";
 import { discoverRecipes } from "@/lib/linkup.functions";
@@ -137,7 +138,14 @@ function RecipeResults() {
                 className="aspect-[4/3] w-full transition-transform duration-500 group-hover:scale-[1.03] sm:aspect-[16/9]"
               />
               <div className="p-5 sm:p-7">
-                <h2 className="text-2xl sm:text-3xl">{recipe.name}</h2>
+                <div className="flex items-start justify-between gap-3">
+                  <h2 className="text-2xl sm:text-3xl">{recipe.name}</h2>
+                  <FavoriteButton
+                    recipe={recipe}
+                    compact
+                    className="h-10 shrink-0 rounded-full px-3"
+                  />
+                </div>
                 {recipe.sourceName && (
                   <p className="mt-1 text-sm text-muted-foreground">from {recipe.sourceName}</p>
                 )}

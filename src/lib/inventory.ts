@@ -11,6 +11,7 @@ export type PantryItem = {
   confidence: number;
   source: PantrySource;
   useSoonDays?: number;
+  updatedAt?: string;
 };
 
 export type ScannedPantryItem = {
@@ -44,30 +45,36 @@ export type ConsumptionEstimate = {
   confidence: number;
 };
 
-function itemId(name: string) {
+export function pantryItemId(name: string) {
   return `pantry-${normalize(name).replace(/[^a-z0-9]+/g, "-")}`;
+}
+
+function nowIso() {
+  return new Date().toISOString();
 }
 
 export function scannedPantryItem(item: ScannedPantryItem): PantryItem {
   return {
-    id: itemId(item.name),
+    id: pantryItemId(item.name),
     name: item.name.trim(),
     quantityEstimate: Math.max(0.1, item.quantityEstimate || 1),
     unit: item.unit,
     confidence: Math.max(0.2, Math.min(0.99, item.confidence || 0.6)),
     source: "scan",
+    updatedAt: nowIso(),
     ...(item.useSoonDays != null ? { useSoonDays: Math.max(0, Math.round(item.useSoonDays)) } : {}),
   };
 }
 
 export function defaultPantryItem(name: string, source: PantrySource = "manual"): PantryItem {
   return {
-    id: itemId(name),
+    id: pantryItemId(name),
     name: name.trim(),
     quantityEstimate: 1,
     unit: "portion",
     confidence: source === "manual" ? 0.9 : 0.78,
     source,
+    updatedAt: nowIso(),
   };
 }
 
@@ -243,6 +250,7 @@ export function applyConsumption(
       quantityEstimate: Math.max(0, item.quantityEstimate - estimate.quantity),
       confidence: Math.max(0.55, Math.min(0.99, (item.confidence + estimate.confidence) / 2)),
       source: "cook",
+      updatedAt: nowIso(),
     };
   });
 }

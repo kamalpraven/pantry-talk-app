@@ -3,6 +3,8 @@ import { ArrowLeft, Clock, Users, Sparkles, Repeat2, Flame, ExternalLink } from 
 import { Button } from "@/components/ui/button";
 import { RecipeImage } from "@/components/RecipeImage";
 import { GroceryFinder } from "@/components/GroceryFinder";
+import { FavoriteButton } from "@/components/FavoriteButton";
+import { RecipeMemory } from "@/components/RecipeMemory";
 import { usePantry } from "@/lib/pantry-store";
 import { matchRecipe, readinessLabel } from "@/lib/recipes";
 import { lookupRecipe } from "@/lib/recipe-cache";
@@ -60,9 +62,12 @@ function RecipeDetail() {
 
       <div className="mx-auto -mt-10 w-full max-w-3xl px-5 sm:px-8">
         <div className="rounded-3xl border border-border bg-card p-6 shadow-lift sm:p-9">
-          <span className="inline-flex rounded-full bg-accent px-3 py-1.5 text-sm font-semibold text-accent-foreground">
-            {readinessLabel(missing)}
-          </span>
+          <div className="flex items-center justify-between gap-3">
+            <span className="inline-flex rounded-full bg-accent px-3 py-1.5 text-sm font-semibold text-accent-foreground">
+              {readinessLabel(missing)}
+            </span>
+            <FavoriteButton recipe={recipe} compact className="h-10 rounded-full px-3" />
+          </div>
           <h1 className="mt-4 text-3xl sm:text-4xl">{recipe.name}</h1>
           <p className="mt-2 text-base text-muted-foreground">{recipe.blurb}</p>
           {recipe.sourceUrl && (
@@ -119,6 +124,8 @@ function RecipeDetail() {
               ))}
             </ul>
           )}
+
+          <RecipeMemory recipeId={recipe.id} />
 
           {substitutions.length > 0 && (
             <section className="mt-6 rounded-2xl bg-secondary p-4">

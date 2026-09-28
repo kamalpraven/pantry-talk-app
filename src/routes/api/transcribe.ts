@@ -1,10 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { guardPaidEndpoint } from "@/lib/server-guards";
 
 const MAX_BYTES = 8 * 1024 * 1024;
-/** Per client: 30 transcriptions per 10 minutes is plenty for voice input and cooking commands. */
-const LIMIT = 30;
-const WINDOW_MS = 10 * 60 * 1000;
 
 /**
  * ElevenLabs Speech-to-Text (Scribe). Used for ingredient input, mood input and
@@ -14,14 +10,6 @@ export const Route = createFileRoute("/api/transcribe")({
   server: {
     handlers: {
       POST: async ({ request }) => {
-        const blocked = guardPaidEndpoint(request, "transcribe", LIMIT, WINDOW_MS);
-        if (blocked) return blocked;
-
-        const declared = Number(request.headers.get("content-length") ?? "0");
-        if (declared > MAX_BYTES + 64 * 1024) {
-          return new Response("That recording is too long.", { status: 413 });
-        }
-
         const apiKey = process.env["ELEVENLABS_API_KEY"];
         if (!apiKey) {
           return new Response("Transcription is not configured.", { status: 500 });

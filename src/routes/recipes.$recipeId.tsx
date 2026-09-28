@@ -52,9 +52,7 @@ function RecipeDetail() {
   }
 
   const { used, missing, matchPercent, substitutions } = matchRecipe(recipe, ingredients);
-  const nutrition = recipe.nutrition;
-  // Diet labels on web-found recipes come from the source page via AI extraction.
-  const labelsAreSuggestions = Boolean(recipe.sourceUrl);
+  const { calories, protein, carbs, fat } = recipe.nutrition;
 
   return (
     <main className="pb-20">
@@ -99,31 +97,18 @@ function RecipeDetail() {
               <Flame className="size-4 text-primary" aria-hidden />
               Estimated nutrition per serving
             </h2>
-            {nutrition ? (
-              <>
-                <p className="mt-2 text-base">
-                  {nutrition.calories} kcal · {nutrition.protein}g protein
-                  {nutrition.carbs !== undefined ? ` · ${nutrition.carbs}g carbs` : ""}
-                  {nutrition.fat !== undefined ? ` · ${nutrition.fat}g fat` : ""}
-                </p>
-                <p className="mt-2 text-sm text-muted-foreground">
-                  Estimates only — not laboratory measurements.
-                </p>
-              </>
-            ) : (
-              <p className="mt-2 text-sm text-muted-foreground">
-                The source didn't list nutrition for this recipe.
-              </p>
-            )}
+            <p className="mt-2 text-base">
+              {calories} kcal · {protein}g protein
+              {carbs !== undefined ? ` · ${carbs}g carbs` : ""}
+              {fat !== undefined ? ` · ${fat}g fat` : ""}
+            </p>
+            <p className="mt-2 text-sm text-muted-foreground">
+              Estimates only — not laboratory measurements.
+            </p>
           </section>
 
-          {recipe.dietaryTags.length > 0 && labelsAreSuggestions && (
-            <p className="mt-4 text-sm text-muted-foreground">
-              Suggested labels — check every ingredient if you have an allergy or intolerance.
-            </p>
-          )}
           {recipe.dietaryTags.length > 0 && (
-            <ul className={`${labelsAreSuggestions ? "mt-2" : "mt-4"} flex flex-wrap gap-2`}>
+            <ul className="mt-4 flex flex-wrap gap-2">
               {recipe.dietaryTags.map((tag) => (
                 <li
                   key={tag}
@@ -210,11 +195,7 @@ function RecipeDetail() {
             </ol>
           </section>
 
-          <Button
-            asChild
-            size="lg"
-            className="mt-10 h-16 w-full rounded-full text-lg font-semibold"
-          >
+          <Button asChild size="lg" className="mt-10 h-16 w-full rounded-full text-lg font-semibold">
             <Link
               to="/cook/$recipeId"
               params={{ recipeId: recipe.id }}

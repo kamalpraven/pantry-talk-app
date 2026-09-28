@@ -27,3 +27,43 @@ npm run dev
 - TypeScript
 - React
 - Tailwind CSS
+
+## Static recipe catalog
+
+Pantry Talk now supports a repo-owned recipe/image catalog so recipe cards do not rely on arbitrary
+publisher/social preview images at runtime.
+
+Build the 1,000-item development snapshot once from source-backed APIs:
+
+```bash
+npm run recipes:build-catalog
+npm run recipes:verify-catalog
+```
+
+The builder uses **no LLM calls**. It prefers TheMealDB, then fills to 1,000 from Wikibooks recipes
+with images. Images are downloaded into `public/recipe-catalog/`, while recipe name, local image path,
+source URL, provider and attribution metadata are written to `src/data/recipe-catalog.generated.ts`
+and `public/recipe-catalog/manifest.json`.
+
+For a public/commercial release, review image licenses/attribution and use a production TheMealDB
+supporter key as required by its terms.
+
+## Static recipe catalog
+
+Pantry Talk now supports a repo-owned recipe/image catalog so recipe cards do not rely on arbitrary
+publisher/social preview images at runtime.
+
+Build the 1,000-item development snapshot once from source-backed APIs:
+
+```bash
+npm run recipes:build-catalog
+npm run recipes:verify-catalog
+```
+
+The builder uses **no LLM calls**. It prefers TheMealDB, then fills to 1,000 from Wikibooks recipes
+with images. Images are downloaded into `public/recipe-catalog/`, while recipe name, local image path,
+source URL, provider and attribution metadata are written to `src/data/recipe-catalog.generated.ts`
+and `public/recipe-catalog/manifest.json`.
+
+For a public/commercial release, review image licenses/attribution and use a production TheMealDB
+supporter key as required by its terms.

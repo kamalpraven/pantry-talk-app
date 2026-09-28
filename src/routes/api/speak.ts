@@ -1,5 +1,4 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { guardPaidEndpoint } from "@/lib/server-guards";
 
 /**
  * ElevenLabs Text-to-Speech. The API key stays server-side; the browser only
@@ -7,17 +6,11 @@ import { guardPaidEndpoint } from "@/lib/server-guards";
  */
 const VOICE_ID = "XrExE9yKIg1WjnnlVkGX"; // Matilda — warm, clear narration
 const MODEL_ID = "eleven_flash_v2_5";
-/** Per client: cooking mode reads each step aloud, so allow a full recipe or two per 10 minutes. */
-const LIMIT = 60;
-const WINDOW_MS = 10 * 60 * 1000;
 
 export const Route = createFileRoute("/api/speak")({
   server: {
     handlers: {
       POST: async ({ request }) => {
-        const blocked = guardPaidEndpoint(request, "speak", LIMIT, WINDOW_MS);
-        if (blocked) return blocked;
-
         const apiKey = process.env["ELEVENLABS_API_KEY"];
         if (!apiKey) {
           return new Response("Voice is not configured.", { status: 500 });

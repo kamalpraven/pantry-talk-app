@@ -19,13 +19,7 @@ import { Input } from "@/components/ui/input";
 import { StepTimer } from "@/components/StepTimer";
 import { lookupRecipe } from "@/lib/recipe-cache";
 import { formatSpokenTime, stepTimerSeconds } from "@/lib/recipes";
-import {
-  speakAloud,
-  startRecording,
-  stopSpeaking,
-  transcribeAudio,
-  type Recorder,
-} from "@/lib/speech";
+import { speakAloud, startRecording, stopSpeaking, transcribeAudio, type Recorder } from "@/lib/speech";
 import { answerFor, parseCommand } from "@/lib/voice-commands";
 import { playChime, useCookingTimer } from "@/lib/use-cooking-timer";
 import { useVibe } from "@/lib/vibe-store";
@@ -227,10 +221,7 @@ function CookingMode() {
     if (!recipe) return;
     const confirmed = consumptionDraft.filter((item) => item.quantity > 0);
     applyConsumption(recipe, confirmed);
-    trackEvent("inventory_update_confirmed", {
-      recipeId: recipe.id,
-      updatedIngredients: confirmed.length,
-    });
+    trackEvent("inventory_update_confirmed", { recipeId: recipe.id, updatedIngredients: confirmed.length });
     setCompletionUpdated(true);
     void speak("Kitchen updated. Your next meal recommendations are already smarter.");
   }
@@ -268,8 +259,7 @@ function CookingMode() {
                 </div>
                 <h1 className="mt-5 text-4xl">Dinner&rsquo;s done.</h1>
                 <p className="mx-auto mt-3 max-w-lg text-base text-muted-foreground">
-                  Pantry Talk estimates what left your kitchen from this recipe. Confirm or adjust
-                  it before the pantry updates.
+                  Pantry Talk estimates what left your kitchen from this recipe. Confirm or adjust it before the pantry updates.
                 </p>
               </div>
 
@@ -282,10 +272,7 @@ function CookingMode() {
                 {consumptionDraft.length ? (
                   <ul className="mt-5 space-y-3">
                     {consumptionDraft.map((item, itemIndex) => (
-                      <li
-                        key={item.pantryItemId}
-                        className="flex items-center justify-between gap-4 rounded-2xl bg-secondary p-4"
-                      >
+                      <li key={item.pantryItemId} className="flex items-center justify-between gap-4 rounded-2xl bg-secondary p-4">
                         <div>
                           <p className="font-semibold">{item.name}</p>
                           <p className="mt-1 text-xs text-muted-foreground">
@@ -319,8 +306,7 @@ function CookingMode() {
                   </ul>
                 ) : (
                   <p className="mt-4 rounded-2xl bg-secondary p-4 text-sm text-muted-foreground">
-                    None of this recipe&rsquo;s ingredients match the pantry items we&rsquo;re
-                    currently tracking.
+                    None of this recipe&rsquo;s ingredients match the pantry items we&rsquo;re currently tracking.
                   </p>
                 )}
 
@@ -347,8 +333,7 @@ function CookingMode() {
                 </div>
                 <h1 className="mt-5 text-4xl">Kitchen updated.</h1>
                 <p className="mx-auto mt-3 max-w-lg text-base text-muted-foreground">
-                  You don&rsquo;t have to remember what changed. Pantry Talk carries the kitchen
-                  state into the next decision.
+                  You don&rsquo;t have to remember what changed. Pantry Talk carries the kitchen state into the next decision.
                 </p>
               </div>
 
@@ -362,8 +347,7 @@ function CookingMode() {
                       <li key={used.pantryItemId} className="rounded-2xl bg-secondary p-4">
                         <p className="font-semibold">{remaining.name}</p>
                         <p className="mt-1 text-sm text-muted-foreground">
-                          ~{formatPantryQuantity(remaining.quantityEstimate, remaining.unit)}{" "}
-                          remaining · {Math.round(remaining.confidence * 100)}% confidence
+                          ~{formatPantryQuantity(remaining.quantityEstimate, remaining.unit)} remaining · {Math.round(remaining.confidence * 100)}% confidence
                         </p>
                       </li>
                     );
@@ -373,8 +357,7 @@ function CookingMode() {
                 <div className="mt-6 rounded-2xl bg-accent p-4 text-accent-foreground">
                   <p className="font-semibold">Pantry Talk closed the loop.</p>
                   <p className="mt-1 text-sm">
-                    {consumptionDraft.length} tracked ingredient
-                    {consumptionDraft.length === 1 ? "" : "s"} updated from one cooking session.
+                    {consumptionDraft.length} tracked ingredient{consumptionDraft.length === 1 ? "" : "s"} updated from one cooking session.
                   </p>
                 </div>
 
@@ -428,12 +411,9 @@ function CookingMode() {
               style={{ width: `${progress}%` }}
             />
           </div>
-          {recipe.nutrition && (
-            <p className="mt-2 text-sm text-muted-foreground">
-              ~{recipe.nutrition.calories} kcal · {recipe.nutrition.protein}g protein / serving
-              (estimated)
-            </p>
-          )}
+          <p className="mt-2 text-sm text-muted-foreground">
+            {recipe.nutrition.calories} kcal · {recipe.nutrition.protein}g protein / serving
+          </p>
         </div>
 
         <div className="flex flex-1 flex-col items-center justify-center gap-8 py-10">
@@ -481,9 +461,7 @@ function CookingMode() {
             >
               Hands-free voice {handsFree ? "on" : "off"}
             </button>
-            {heard && (
-              <p className="text-sm text-muted-foreground">You said: &ldquo;{heard}&rdquo;</p>
-            )}
+            {heard && <p className="text-sm text-muted-foreground">You said: &ldquo;{heard}&rdquo;</p>}
             {note && <p className="text-sm font-medium text-primary">{note}</p>}
           </div>
         </div>

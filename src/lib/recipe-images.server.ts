@@ -5,45 +5,7 @@
  * are frequently logos, avatars, or social-share art.
  */
 
-import { isPublicHttpsUrl } from "./server-guards";
-
 const cache = new Map<string, string>();
-const MAX_CACHE_ENTRIES = 500;
-const MAX_REDIRECTS = 3;
-const TIMEOUT_MS = 6000;
-
-function remember(pageUrl: string, image: string) {
-  if (cache.size >= MAX_CACHE_ENTRIES) {
-    const oldest = cache.keys().next().value;
-    if (oldest !== undefined) cache.delete(oldest);
-  }
-  cache.set(pageUrl, image);
-}
-
-/** Fetches a page, following redirects only to public https hosts. */
-async function fetchPage(start: string): Promise<{ response: Response; url: string } | null> {
-  let current = start;
-  for (let hop = 0; hop <= MAX_REDIRECTS; hop += 1) {
-    if (!isPublicHttpsUrl(current)) return null;
-    const response = await fetch(current, {
-      headers: {
-        "User-Agent":
-          "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124 Safari/537.36",
-        Accept: "text/html,application/xhtml+xml",
-      },
-      redirect: "manual",
-      signal: AbortSignal.timeout(TIMEOUT_MS),
-    });
-    if (response.status >= 300 && response.status < 400) {
-      const location = response.headers.get("location");
-      if (!location) return null;
-      current = new URL(location, current).toString();
-      continue;
-    }
-    return { response, url: current };
-  }
-  return null;
-}
 
 const META_PATTERNS: RegExp[] = [
   /<meta[^>]+property=["']og:image(?::secure_url|:url)?["'][^>]+content=["']([^"']+)["']/i,
@@ -60,7 +22,7 @@ function absolute(candidate: string, pageUrl: string): string | null {
   try {
     const decoded = candidate.replace(/&amp;/g, "&").trim();
     const url = new URL(decoded, pageUrl);
-    if (!isPublicHttpsUrl(url.toString())) return null;
+    if (url.protocol !== "https:") return null;
     // Test the complete URL, not only pathname: CDN/query strings often reveal
     // that an asset is a logo/social image even when the path itself does not.
     if (BAD.test(url.toString())) return null;
@@ -120,8 +82,7 @@ function findRecipeImage(value: unknown): string | null {
 }
 
 function recipeJsonLdImage(html: string, pageUrl: string): string | null {
-  const scriptPattern =
-    /<script[^>]+type=["']application\/ld\+json["'][^>]*>([\s\S]*?)<\/script>/gi;
+  const scriptPattern = /<script[^>]+type=["']application\/ld\+json["'][^>]*>([\s\S]*?)<\/script>/gi;
   let match: RegExpExecArray | null;
   while ((match = scriptPattern.exec(html))) {
     const raw = match[1]?.trim();
@@ -145,24 +106,26 @@ async function fetchPreviewImage(pageUrl: string): Promise<string | null> {
   if (cached !== undefined) return cached || null;
 
   try {
-    const fetched = await fetchPage(pageUrl);
-    if (!fetched) {
-      remember(pageUrl, "");
-      return null;
-    }
-    const { response } = fetched;
+    const response = await fetch(pageUrl, {
+      headers: {
+        "User-Agent":
+          "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124 Safari/537.36",
+        Accept: "text/html,application/xhtml+xml",
+      },
+      redirect: "follow",
+    });
     if (!response.ok) {
-      remember(pageUrl, "");
+      cache.set(pageUrl, "");
       return null;
     }
 
-    const resolvedPageUrl = fetched.url;
+    const resolvedPageUrl = response.url || pageUrl;
     const html = (await response.text()).slice(0, 800_000);
 
     // Strongest signal: structured Recipe data from the recipe page itself.
     const structured = recipeJsonLdImage(html, resolvedPageUrl);
     if (structured) {
-      remember(pageUrl, structured);
+      cache.set(pageUrl, structured);
       return structured;
     }
 
@@ -172,7 +135,7 @@ async function fetchPreviewImage(pageUrl: string): Promise<string | null> {
       if (match?.[1]) {
         const resolved = absolute(match[1], resolvedPageUrl);
         if (resolved) {
-          remember(pageUrl, resolved);
+          cache.set(pageUrl, resolved);
           return resolved;
         }
       }
@@ -181,7 +144,7 @@ async function fetchPreviewImage(pageUrl: string): Promise<string | null> {
     /* ignore — the UI renders a neutral food placeholder */
   }
 
-  remember(pageUrl, "");
+  cache.set(pageUrl, "");
   return null;
 }
 
@@ -193,7 +156,7 @@ export async function resolveRecipeImages(
   pageUrls: string[],
   concurrency = 5,
 ): Promise<Record<string, string>> {
-  const unique = [...new Set(pageUrls.filter((u) => isPublicHttpsUrl(u)))];
+  const unique = [...new Set(pageUrls.filter((u) => /^https:\/\//.test(u)))];
   const found: Record<string, string> = {};
   for (let i = 0; i < unique.length; i += concurrency) {
     const batch = unique.slice(i, i + concurrency);

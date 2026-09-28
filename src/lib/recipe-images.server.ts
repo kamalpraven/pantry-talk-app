@@ -1,31 +1,143 @@
 /**
- * Server-only helper: finds a photo for a web-discovered recipe by reading the
- * recipe page's own social preview image (og:image / twitter:image / etc.).
+ * Server-only helper: resolves a trustworthy hero photo for a web-discovered
+ * recipe. Prefer schema.org Recipe JSON-LD; social preview images are only a
+ * fallback. We deliberately avoid grabbing arbitrary <img> tags because those
+ * are frequently logos, avatars, or social-share art.
  */
 
-const cache = new Map<string, string>();
+import { isPublicHttpsUrl } from "./server-guards";
 
-const PATTERNS: RegExp[] = [
+const cache = new Map<string, string>();
+const MAX_CACHE_ENTRIES = 500;
+const MAX_REDIRECTS = 3;
+const TIMEOUT_MS = 6000;
+
+function remember(pageUrl: string, image: string) {
+  if (cache.size >= MAX_CACHE_ENTRIES) {
+    const oldest = cache.keys().next().value;
+    if (oldest !== undefined) cache.delete(oldest);
+  }
+  cache.set(pageUrl, image);
+}
+
+/** Fetches a page, following redirects only to public https hosts. */
+async function fetchPage(start: string): Promise<{ response: Response; url: string } | null> {
+  let current = start;
+  for (let hop = 0; hop <= MAX_REDIRECTS; hop += 1) {
+    if (!isPublicHttpsUrl(current)) return null;
+    const response = await fetch(current, {
+      headers: {
+        "User-Agent":
+          "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124 Safari/537.36",
+        Accept: "text/html,application/xhtml+xml",
+      },
+      redirect: "manual",
+      signal: AbortSignal.timeout(TIMEOUT_MS),
+    });
+    if (response.status >= 300 && response.status < 400) {
+      const location = response.headers.get("location");
+      if (!location) return null;
+      current = new URL(location, current).toString();
+      continue;
+    }
+    return { response, url: current };
+  }
+  return null;
+}
+
+const META_PATTERNS: RegExp[] = [
   /<meta[^>]+property=["']og:image(?::secure_url|:url)?["'][^>]+content=["']([^"']+)["']/i,
   /<meta[^>]+content=["']([^"']+)["'][^>]+property=["']og:image(?::secure_url|:url)?["']/i,
   /<meta[^>]+name=["']twitter:image(?::src)?["'][^>]+content=["']([^"']+)["']/i,
   /<meta[^>]+content=["']([^"']+)["'][^>]+name=["']twitter:image(?::src)?["']/i,
   /<link[^>]+rel=["']image_src["'][^>]+href=["']([^"']+)["']/i,
-  /"image"\s*:\s*"(https:\/\/[^"']+?\.(?:jpg|jpeg|png|webp)[^"']*)"/i,
-  /<img[^>]+src=["'](https:\/\/[^"']+?\.(?:jpg|jpeg|png|webp)[^"']*)["']/i,
 ];
 
-const BAD = /(sprite|logo|icon|avatar|placeholder|1x1|pixel|blank)/i;
+const BAD =
+  /(sprite|logo|icon|avatar|placeholder|1x1|pixel|blank|facebook|twitter|instagram|pinterest|youtube|whatsapp|tiktok|linkedin|social|share[-_/]?button)/i;
 
 function absolute(candidate: string, pageUrl: string): string | null {
   try {
-    const url = new URL(candidate.replace(/&amp;/g, "&"), pageUrl);
-    if (url.protocol !== "https:") return null;
-    if (BAD.test(url.pathname)) return null;
+    const decoded = candidate.replace(/&amp;/g, "&").trim();
+    const url = new URL(decoded, pageUrl);
+    if (!isPublicHttpsUrl(url.toString())) return null;
+    // Test the complete URL, not only pathname: CDN/query strings often reveal
+    // that an asset is a logo/social image even when the path itself does not.
+    if (BAD.test(url.toString())) return null;
     return url.toString();
   } catch {
     return null;
   }
+}
+
+function hasRecipeType(value: unknown): boolean {
+  if (typeof value === "string") return value.toLowerCase() === "recipe";
+  if (Array.isArray(value)) return value.some(hasRecipeType);
+  return false;
+}
+
+function imageCandidate(value: unknown): string | null {
+  if (typeof value === "string") return value;
+  if (Array.isArray(value)) {
+    for (const item of value) {
+      const candidate = imageCandidate(item);
+      if (candidate) return candidate;
+    }
+    return null;
+  }
+  if (value && typeof value === "object") {
+    const obj = value as Record<string, unknown>;
+    for (const key of ["url", "contentUrl", "thumbnailUrl"]) {
+      if (typeof obj[key] === "string") return obj[key] as string;
+    }
+  }
+  return null;
+}
+
+function findRecipeImage(value: unknown): string | null {
+  if (!value) return null;
+  if (Array.isArray(value)) {
+    for (const item of value) {
+      const candidate = findRecipeImage(item);
+      if (candidate) return candidate;
+    }
+    return null;
+  }
+  if (typeof value !== "object") return null;
+
+  const obj = value as Record<string, unknown>;
+  if (hasRecipeType(obj["@type"])) {
+    const candidate = imageCandidate(obj["image"] ?? obj["thumbnailUrl"]);
+    if (candidate) return candidate;
+  }
+
+  // JSON-LD commonly wraps entities in @graph.
+  if (obj["@graph"]) {
+    const candidate = findRecipeImage(obj["@graph"]);
+    if (candidate) return candidate;
+  }
+  return null;
+}
+
+function recipeJsonLdImage(html: string, pageUrl: string): string | null {
+  const scriptPattern =
+    /<script[^>]+type=["']application\/ld\+json["'][^>]*>([\s\S]*?)<\/script>/gi;
+  let match: RegExpExecArray | null;
+  while ((match = scriptPattern.exec(html))) {
+    const raw = match[1]?.trim();
+    if (!raw) continue;
+    try {
+      const parsed = JSON.parse(raw);
+      const candidate = findRecipeImage(parsed);
+      if (candidate) {
+        const resolved = absolute(candidate, pageUrl);
+        if (resolved) return resolved;
+      }
+    } catch {
+      // Some sites emit malformed JSON-LD; continue to other scripts/meta tags.
+    }
+  }
+  return null;
 }
 
 async function fetchPreviewImage(pageUrl: string): Promise<string | null> {
@@ -33,46 +145,55 @@ async function fetchPreviewImage(pageUrl: string): Promise<string | null> {
   if (cached !== undefined) return cached || null;
 
   try {
-    const response = await fetch(pageUrl, {
-      headers: {
-        // Some recipe sites serve a stripped page to unknown clients.
-        "User-Agent":
-          "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124 Safari/537.36",
-        Accept: "text/html,application/xhtml+xml",
-      },
-      redirect: "follow",
-    });
-    if (!response.ok) {
-      cache.set(pageUrl, "");
+    const fetched = await fetchPage(pageUrl);
+    if (!fetched) {
+      remember(pageUrl, "");
       return null;
     }
-    const html = (await response.text()).slice(0, 400_000);
-    for (const pattern of PATTERNS) {
+    const { response } = fetched;
+    if (!response.ok) {
+      remember(pageUrl, "");
+      return null;
+    }
+
+    const resolvedPageUrl = fetched.url;
+    const html = (await response.text()).slice(0, 800_000);
+
+    // Strongest signal: structured Recipe data from the recipe page itself.
+    const structured = recipeJsonLdImage(html, resolvedPageUrl);
+    if (structured) {
+      remember(pageUrl, structured);
+      return structured;
+    }
+
+    // Fallback to social preview metadata. Never fall through to a random img.
+    for (const pattern of META_PATTERNS) {
       const match = pattern.exec(html);
       if (match?.[1]) {
-        const resolved = absolute(match[1], response.url || pageUrl);
+        const resolved = absolute(match[1], resolvedPageUrl);
         if (resolved) {
-          cache.set(pageUrl, resolved);
+          remember(pageUrl, resolved);
           return resolved;
         }
       }
     }
   } catch {
-    /* ignore — the caller falls back to a bundled photo */
+    /* ignore — the UI renders a neutral food placeholder */
   }
-  cache.set(pageUrl, "");
+
+  remember(pageUrl, "");
   return null;
 }
 
 /**
- * Resolves preview photos for a batch of recipe page URLs, a few at a time.
- * Returns a map of page URL to image URL for the ones that were found.
+ * Resolves hero photos for a batch of recipe page URLs, a few at a time.
+ * Returns a map of page URL to image URL only where a credible image exists.
  */
 export async function resolveRecipeImages(
   pageUrls: string[],
   concurrency = 5,
 ): Promise<Record<string, string>> {
-  const unique = [...new Set(pageUrls.filter((u) => /^https:\/\//.test(u)))];
+  const unique = [...new Set(pageUrls.filter((u) => isPublicHttpsUrl(u)))];
   const found: Record<string, string> = {};
   for (let i = 0; i < unique.length; i += concurrency) {
     const batch = unique.slice(i, i + concurrency);

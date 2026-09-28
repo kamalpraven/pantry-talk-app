@@ -14,13 +14,7 @@ import tomatoCheddarToast from "@/assets/tomato-cheddar-toast.jpg";
  */
 
 export type MealPreference =
-  | "Anything"
-  | "Quick"
-  | "High Protein"
-  | "Healthy"
-  | "Breakfast"
-  | "Lunch"
-  | "Dinner";
+  "Anything" | "Quick" | "High Protein" | "Healthy" | "Breakfast" | "Lunch" | "Dinner";
 
 export const MEAL_PREFERENCES: MealPreference[] = [
   "Anything",
@@ -53,30 +47,112 @@ export const DIET_GOALS: DietGoal[] = [
 ];
 
 /** Assumed to always be in the kitchen — never counted as missing. */
-export const ASSUMED_STAPLES = [
-  "Olive oil",
-  "Salt",
-  "Black pepper",
-  "Water",
-  "Dried spices",
-];
+export const ASSUMED_STAPLES = ["Olive oil", "Salt", "Black pepper", "Water", "Dried spices"];
 
-const STAPLE_MATCHERS = [
-  "oil",
+/**
+ * Pantry basics the app assumes every kitchen has. Matching is on the whole
+ * ingredient name, not a substring, so "bell pepper", "watermelon" and
+ * "salted butter" are never mistaken for pepper, water or salt.
+ */
+const STAPLE_NAMES = [
+  // salt & pepper
   "salt",
+  "sea salt",
+  "kosher salt",
+  "table salt",
   "pepper",
+  "black pepper",
+  "ground pepper",
+  "ground black pepper",
+  "freshly ground black pepper",
+  "salt and pepper",
+  "salt & pepper",
+  // water
   "water",
+  "cold water",
+  "warm water",
+  "hot water",
+  "boiling water",
+  // everyday cooking oils
+  "oil",
+  "olive oil",
+  "extra virgin olive",
+  "extra virgin olive oil",
+  "cooking oil",
+  "vegetable oil",
+  "canola oil",
+  "neutral oil",
+  "sunflower oil",
+  "cooking spray",
+  // common dried spices
   "spice",
   "spices",
-  "paprika",
+  "dried spices",
   "cumin",
+  "ground cumin",
+  "paprika",
+  "smoked paprika",
   "chili flakes",
-  "herbs",
+  "chilli flakes",
+  "red pepper flakes",
+  "crushed red pepper",
+  "chili powder",
+  "garlic powder",
+  "onion powder",
+  "dried oregano",
+  "dried thyme",
+  "dried herbs",
+  "mixed herbs",
+  "italian seasoning",
+  "ground turmeric",
+  "turmeric",
 ];
 
+/** Words that describe a staple without changing what it is ("freshly ground", "kosher"). */
+const STAPLE_DESCRIPTORS = new Set([
+  "a",
+  "an",
+  "and",
+  "coarse",
+  "coarsely",
+  "dash",
+  "drizzle",
+  "fine",
+  "finely",
+  "flaky",
+  "for",
+  "fresh",
+  "freshly",
+  "frying",
+  "good",
+  "ground",
+  "kosher",
+  "of",
+  "pinch",
+  "quality",
+  "sea",
+  "some",
+  "splash",
+  "table",
+  "to",
+  "taste",
+]);
+
+function stapleKey(value: string): string {
+  const words = value
+    .toLowerCase()
+    .replace(/[^a-z& ]+/g, " ")
+    .split(/\s+/)
+    .filter((word) => word && !STAPLE_DESCRIPTORS.has(word));
+  // No plural stripping here: "peppers" in a recipe means bell peppers, not
+  // the pepper grinder, so only the exact listed names count as staples.
+  return words.join(" ");
+}
+
+const STAPLE_SET = new Set(STAPLE_NAMES.map((name) => stapleKey(name)));
+
 export function isStaple(ingredient: string) {
-  const value = normalize(ingredient);
-  return STAPLE_MATCHERS.some((s) => value.includes(s));
+  return STAPLE_SET.has(stapleKey(ingredient));
 }
 
 export function normalize(value: string) {
@@ -91,7 +167,6 @@ export type Nutrition = {
   fat?: number;
 };
 
-
 export type Recipe = {
   id: string;
   name: string;
@@ -101,7 +176,8 @@ export type Recipe = {
   blurb: string;
   tags: MealPreference[];
   dietaryTags: DietGoal[];
-  nutrition: Nutrition;
+  /** Only present when the source supplied real figures — never invented. */
+  nutrition?: Nutrition;
   /** Key (non-staple) ingredients the dish needs. */
   keyIngredients: string[];
   /** Ingredients the dish is defined by — never offered a substitution. */
@@ -116,7 +192,6 @@ export type Recipe = {
   sourceUrl?: string;
   sourceName?: string;
 };
-
 
 /** Practical swaps — suggestions, never guaranteed equivalents. */
 export const SUBSTITUTIONS: Record<string, string> = {
@@ -317,7 +392,7 @@ function buildReason(
   const limit = TIME_LIMIT_MINUTES[filters.timeLimit];
 
   if (filters.goals.includes("High Protein") && isTopProtein && fitsTime) {
-    return `Highest-protein option at ${recipe.nutrition.protein}g per serving that still fits your time limit.`;
+    return `Highest-protein option at ${recipe.nutrition?.protein}g per serving that still fits your time limit.`;
   }
   if (used.length && missing.length === 0) {
     return `Uses ${used.length} of your ${pantry.length} ingredients and needs nothing extra, in ${recipe.timeMinutes} minutes.`;
@@ -334,6 +409,11 @@ function buildReason(
   return `A simple ${recipe.timeMinutes}-minute dish worth keeping in mind.`;
 }
 
+/** Protein for ranking; unknown sorts below any known value. */
+function proteinOf(recipe: Recipe): number {
+  return recipe.nutrition?.protein ?? -1;
+}
+
 export function findRecipes(
   pantry: string[],
   filters: RecipeFilters,
@@ -342,11 +422,11 @@ export function findRecipes(
   const limit = TIME_LIMIT_MINUTES[filters.timeLimit];
   const base = pool.map((recipe) => matchRecipe(recipe, pantry));
 
-
   const qualifying = base.filter((m) => m.recipe.timeMinutes <= limit);
+  // Recipes without real nutrition data never win "highest protein".
   const topProtein = qualifying
-    .slice()
-    .sort((a, b) => b.recipe.nutrition.protein - a.recipe.nutrition.protein)[0];
+    .filter((m) => m.recipe.nutrition)
+    .sort((a, b) => proteinOf(b.recipe) - proteinOf(a.recipe))[0];
 
   const matches: RecipeMatch[] = base.map((m) => {
     const fitsTime = m.recipe.timeMinutes <= limit;
@@ -357,13 +437,7 @@ export function findRecipes(
       ...m,
       fitsTime,
       labels,
-      reason: buildReason(
-        m,
-        pantry,
-        filters,
-        fitsTime,
-        topProtein?.recipe.id === m.recipe.id,
-      ),
+      reason: buildReason(m, pantry, filters, fitsTime, topProtein?.recipe.id === m.recipe.id),
     };
   });
 
@@ -380,7 +454,7 @@ export function findRecipes(
     if (cookability(b) !== cookability(a)) return cookability(b) - cookability(a);
     if (goalScore(b) !== goalScore(a)) return goalScore(b) - goalScore(a);
     if (filters.goals.includes("High Protein")) {
-      const p = b.recipe.nutrition.protein - a.recipe.nutrition.protein;
+      const p = proteinOf(b.recipe) - proteinOf(a.recipe);
       if (p !== 0) return p;
     }
     const prefScore = (m: RecipeMatch) =>
@@ -459,7 +533,6 @@ export function formatSpokenTime(seconds: number) {
   if (s) parts.push(`${s} second${s === 1 ? "" : "s"}`);
   return parts.join(" and ") || "no time";
 }
-
 
 export function timerLabel(seconds: number) {
   if (seconds % 60 === 0) {

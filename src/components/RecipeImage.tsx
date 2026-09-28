@@ -1,63 +1,62 @@
-import { useState } from "react";
-import { UtensilsCrossed } from "lucide-react";
+import { useEffect, useState } from "react";
+import { ChefHat } from "lucide-react";
 import type { Recipe } from "@/lib/recipes";
-import avocadoEggToast from "@/assets/avocado-egg-toast.jpg";
-import cheesyTomatoOmelette from "@/assets/cheesy-tomato-omelette.jpg";
-import eggSaladSandwich from "@/assets/egg-salad-sandwich.jpg";
-import shakshukaEggs from "@/assets/shakshuka-eggs.jpg";
-import tomatoCheddarToast from "@/assets/tomato-cheddar-toast.jpg";
-
-const FALLBACKS = [
-  avocadoEggToast,
-  cheesyTomatoOmelette,
-  eggSaladSandwich,
-  shakshukaEggs,
-  tomatoCheddarToast,
-];
-
-/** Same dish always gets the same stand-in photo. */
-function fallbackFor(recipe: Recipe): string {
-  const key = `${recipe.name}${recipe.id}`;
-  let hash = 0;
-  for (let i = 0; i < key.length; i += 1) hash = (hash * 31 + key.charCodeAt(i)) % 100000;
-  return FALLBACKS[hash % FALLBACKS.length] ?? avocadoEggToast;
-}
 
 function displaySrc(raw: string): string {
-  // Remote photos go through the app so sites that block hotlinking still work.
-  return /^https:\/\//.test(raw)
-    ? `/api/public/recipe-image?url=${encodeURIComponent(raw)}`
-    : raw;
+  // Live-search photos arrive as signed /api/public/recipe-image paths from
+  // the server. Older cached recipes may still hold a plain remote URL; load
+  // those directly (the placeholder covers sites that block hotlinking).
+  return raw;
+}
+
+function RecipePlaceholder({
+  recipe,
+  className,
+}: {
+  recipe: Recipe;
+  className?: string | undefined;
+}) {
+  return (
+    <div
+      className={`relative flex items-center justify-center overflow-hidden bg-gradient-to-br from-secondary via-background to-accent ${className ?? ""}`}
+      role="img"
+      aria-label={`${recipe.name} photo unavailable`}
+    >
+      <div className="absolute inset-0 opacity-40 [background:radial-gradient(circle_at_25%_25%,hsl(var(--primary)/0.20),transparent_35%),radial-gradient(circle_at_75%_70%,hsl(var(--accent-foreground)/0.12),transparent_40%)]" />
+      <div className="relative flex max-w-[80%] flex-col items-center gap-3 text-center">
+        <span className="flex size-14 items-center justify-center rounded-full bg-background/80 shadow-sm">
+          <ChefHat className="size-7 text-primary" aria-hidden />
+        </span>
+        <span className="text-sm font-semibold text-muted-foreground">
+          Recipe photo unavailable
+        </span>
+      </div>
+    </div>
+  );
 }
 
 /**
- * Shows the recipe's own photo (bundled or from live discovery) and falls back
- * to a bundled food photo instead of a blank card.
+ * Shows the recipe's own photo. For live web recipes, a missing/broken image
+ * intentionally falls back to a neutral placeholder instead of an unrelated
+ * dish photo, which would be misleading.
  */
 export function RecipeImage({ recipe, className }: { recipe: Recipe; className?: string }) {
-  const [failed, setFailed] = useState(false);
   const raw = recipe.image || recipe.imageUrl || "";
-  const src = raw && !failed ? displaySrc(raw) : fallbackFor(recipe);
-  const [fallbackFailed, setFallbackFailed] = useState(false);
+  const [failed, setFailed] = useState(false);
 
-  if (fallbackFailed) {
-    return (
-      <div
-        className={`flex items-center justify-center bg-gradient-to-br from-secondary to-accent ${className ?? ""}`}
-        aria-hidden
-      >
-        <UtensilsCrossed className="size-10 text-primary/50" />
-      </div>
-    );
+  useEffect(() => setFailed(false), [raw, recipe.id]);
+
+  if (!raw || failed) {
+    return <RecipePlaceholder recipe={recipe} className={className} />;
   }
 
   return (
     <img
-      src={src}
+      src={displaySrc(raw)}
       alt={recipe.name}
       loading="lazy"
       referrerPolicy="no-referrer"
-      onError={() => (failed || !raw ? setFallbackFailed(true) : setFailed(true))}
+      onError={() => setFailed(true)}
       className={`object-cover ${className ?? ""}`}
     />
   );

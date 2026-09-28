@@ -76,8 +76,6 @@ const STORE_SCHEMA = JSON.stringify({
         properties: {
           name: { type: "string" },
           address: { type: "string" },
-          latitude: { type: "number" },
-          longitude: { type: "number" },
           estimatedDistanceMiles: { type: "number" },
           url: { type: "string" },
         },
@@ -97,7 +95,8 @@ const UNIT_WORDS = new RegExp(
   "i",
 );
 
-function cleanIngredient(line: string): string {
+/** Removes quantities, units and prep words, keeping the full ingredient name. */
+function stripIngredientLine(line: string): string {
   let value = line
     .replace(/\([^)]*\)/g, " ")
     .replace(/,.*$/, " ")
@@ -110,7 +109,11 @@ function cleanIngredient(line: string): string {
     value = value.replace(UNIT_WORDS, "").trim();
     guard += 1;
   }
-  const words = value.split(" ").slice(0, 3).join(" ").trim();
+  return value;
+}
+
+function cleanIngredient(line: string): string {
+  const words = stripIngredientLine(line).split(" ").slice(0, 3).join(" ").trim();
   if (!words) return "";
   return words.charAt(0).toUpperCase() + words.slice(1).toLowerCase();
 }
@@ -173,10 +176,7 @@ function normaliseRecipe(raw: RawRecipe, salt: number): Recipe | null {
     : [];
   if (!name || steps.length < 2 || lines.length === 0) return null;
 
-  const timeMinutes = Math.max(
-    3,
-    Math.min(240, Math.round(Number(raw["timeMinutes"]) || 25)),
-  );
+  const timeMinutes = Math.max(3, Math.min(240, Math.round(Number(raw["timeMinutes"]) || 25)));
   const protein = Math.max(0, Math.round(Number(raw["protein"]) || 0));
   const calories = Math.max(0, Math.round(Number(raw["calories"]) || 0));
   const carbs = Number(raw["carbs"]);
@@ -188,31 +188,38 @@ function normaliseRecipe(raw: RawRecipe, salt: number): Recipe | null {
 
   const cleaned: string[] = [];
   for (const line of lines) {
+    // Check staples on the full name first: truncating "freshly ground black
+    // pepper" to three words would otherwise hide that it's a staple.
+    if (isStaple(stripIngredientLine(line))) continue;
     const item = cleanIngredient(line);
     if (!item || item.length < 3 || isStaple(item)) continue;
     if (!cleaned.some((existing) => normalize(existing) === normalize(item))) cleaned.push(item);
   }
   if (cleaned.length === 0) return null;
 
-  const imageUrl = typeof raw["imageUrl"] === "string" ? raw["imageUrl"] : "";
   const sourceUrl = typeof raw["sourceUrl"] === "string" ? raw["sourceUrl"] : "";
 
   return {
     id: slugify(name, salt),
     name,
-    image: /^https:\/\//.test(imageUrl) ? imageUrl : "",
-    ...(/^https:\/\//.test(imageUrl) ? { imageUrl } : {}),
+    image: "",
     timeMinutes,
     servings: Math.max(1, Math.min(8, Math.round(Number(raw["servings"]) || 2))),
     blurb,
     tags: inferMealTags({ name, timeMinutes, protein, blurb }),
     dietaryTags: toDietGoals(raw["dietaryTags"], protein),
-    nutrition: {
-      calories: calories || Math.round(timeMinutes * 14 + 220),
-      protein: protein || 12,
-      ...(Number.isFinite(carbs) && carbs > 0 ? { carbs: Math.round(carbs) } : {}),
-      ...(Number.isFinite(fat) && fat > 0 ? { fat: Math.round(fat) } : {}),
-    },
+    // Only show nutrition the source actually provided. Missing values are
+    // left out rather than filled with a made-up number.
+    ...(calories > 0 && protein > 0
+      ? {
+          nutrition: {
+            calories,
+            protein,
+            ...(Number.isFinite(carbs) && carbs > 0 ? { carbs: Math.round(carbs) } : {}),
+            ...(Number.isFinite(fat) && fat > 0 ? { fat: Math.round(fat) } : {}),
+          },
+        }
+      : {}),
     keyIngredients: cleaned.slice(0, 8),
     essentialIngredients: cleaned.slice(0, 2),
     staples: ASSUMED_STAPLES.slice(0, 3),
@@ -272,16 +279,20 @@ export const discoverRecipes = createServerFn({ method: "POST" })
     const timeText = Number.isFinite(minutes)
       ? `Each recipe must take about ${minutes} minutes or less.`
       : "Cooking time is flexible.";
-    const goalText = data.goals.length ? `They should suit these goals: ${data.goals.join(", ")}.` : "";
+    const goalText = data.goals.length
+      ? `They should suit these goals: ${data.goals.join(", ")}.`
+      : "";
     const mealText =
-      data.preference && data.preference !== "Anything" ? `Focus on ${data.preference} dishes.` : "";
+      data.preference && data.preference !== "Anything"
+        ? `Focus on ${data.preference} dishes.`
+        : "";
 
     const query =
       `Find 10 to 14 different practical home recipes that mainly use these ingredients: ` +
       `${data.ingredients.join(", ")}. Assume salt, pepper, cooking oil, water and common dried spices ` +
       `are already available. Use sensible subsets — do not force every ingredient into every dish. ` +
       `${timeText} ${goalText} ${mealText} For each recipe include the dish name, the source website ` +
-      `name and URL, a direct photo URL of the finished dish, total cooking time in minutes, servings, ` +
+      `name and URL, total cooking time in minutes, servings, ` +
       `a one-sentence description, the ingredient list, the numbered cooking steps, and estimated ` +
       `calories, protein, carbohydrates and fat per serving.`;
 
@@ -299,8 +310,10 @@ export const discoverRecipes = createServerFn({ method: "POST" })
         return { recipes, error: "Live recipe search returned too little to work with." };
       }
 
-      // Live search rarely returns photos, so read each recipe page's own preview image.
-      const needsImage = recipes.filter((r) => !r.imageUrl && !r.image && r.sourceUrl);
+      // Resolve each photo from the actual recipe page instead of trusting an
+      // image URL synthesized by search. Search results can return social icons,
+      // publisher logos, or unrelated thumbnails.
+      const needsImage = recipes.filter((r) => r.sourceUrl);
       if (needsImage.length) {
         const { resolveRecipeImages } = await import("./recipe-images.server");
         const found = await resolveRecipeImages(
@@ -308,9 +321,27 @@ export const discoverRecipes = createServerFn({ method: "POST" })
         );
         for (const recipe of needsImage) {
           const image = recipe.sourceUrl ? found[recipe.sourceUrl] : undefined;
-          if (image) recipe.imageUrl = image;
+          if (image) {
+            recipe.imageUrl = image;
+            recipe.image = image;
+          }
         }
       }
+
+      // Route remote photos through our proxy with a server signature, so the
+      // proxy only ever relays images this search actually found.
+      const { signedImagePath } = await import("./server-guards");
+      await Promise.all(
+        recipes.map(async (recipe) => {
+          const remote = recipe.imageUrl || (/^https:\/\//.test(recipe.image) ? recipe.image : "");
+          if (!remote) return;
+          const signed = await signedImagePath(remote);
+          if (signed) {
+            recipe.image = signed;
+            recipe.imageUrl = signed;
+          }
+        }),
+      );
 
       return { recipes, error: null };
     } catch (error) {
@@ -336,11 +367,12 @@ export const findGroceryStores = createServerFn({ method: "POST" })
       return { stores: [], error: "Nearby grocery search is temporarily unavailable." };
     }
 
-    const where = data.kind === "zip" ? `ZIP code ${data.location}` : `the address ${data.location}`;
+    const where =
+      data.kind === "zip" ? `ZIP code ${data.location}` : `the address ${data.location}`;
     const query =
       `List 3 to 5 grocery stores or supermarkets near ${where} where someone could buy ` +
       `${data.missing.length ? data.missing.join(", ") : "everyday groceries"}. ` +
-      `For each store give the store name, full street address, latitude, longitude, ` +
+      `For each store give the store name, full street address, ` +
       `approximate distance in miles from ${where}, and the store's website URL.`;
 
     try {
@@ -351,16 +383,17 @@ export const findGroceryStores = createServerFn({ method: "POST" })
         const name = typeof item["name"] === "string" ? item["name"].trim() : "";
         const address = typeof item["address"] === "string" ? item["address"].trim() : "";
         if (!name || !address) return;
-        const lat = Number(item["latitude"]);
-        const lng = Number(item["longitude"]);
         const miles = Number(item["estimatedDistanceMiles"]);
         stores.push({
           id: slugify(name, i + 1),
           name,
           address,
-          latitude: Number.isFinite(lat) && lat !== 0 ? lat : null,
-          longitude: Number.isFinite(lng) && lng !== 0 ? lng : null,
-          estimated_distance_miles: Number.isFinite(miles) && miles > 0 ? Math.round(miles * 10) / 10 : null,
+          // Coordinates from a web-search model can be invented, so none are
+          // stored; directions use the store name and address instead.
+          latitude: null,
+          longitude: null,
+          estimated_distance_miles:
+            Number.isFinite(miles) && miles > 0 ? Math.round(miles * 10) / 10 : null,
           directions_url: `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(
             `${name} ${address}`,
           )}`,

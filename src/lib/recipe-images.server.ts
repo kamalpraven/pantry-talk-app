@@ -113,6 +113,7 @@ async function fetchPreviewImage(pageUrl: string): Promise<string | null> {
         Accept: "text/html,application/xhtml+xml",
       },
       redirect: "follow",
+      signal: AbortSignal.timeout(5000),
     });
     if (!response.ok) {
       cache.set(pageUrl, "");

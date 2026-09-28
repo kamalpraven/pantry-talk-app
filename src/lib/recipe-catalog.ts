@@ -35,7 +35,7 @@ export function findCatalogRecipe(title: string): RecipeCatalogEntry | null {
   const normalized = normalizeTitle(title);
   const direct = exact.get(normalized);
   if (direct) return direct;
-  if (!normalized || RECIPE_CATALOG.length === 0) return null;
+  if (!normalized || (RECIPE_CATALOG.length as number) === 0) return null;
 
   const queryTokens = tokens(normalized);
   let best: RecipeCatalogEntry | null = null;

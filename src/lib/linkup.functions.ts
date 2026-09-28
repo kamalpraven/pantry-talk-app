@@ -304,8 +304,22 @@ export const discoverRecipes = createServerFn({ method: "POST" })
         return { recipes, error: "Live recipe search returned too little to work with." };
       }
 
-      // Images come only from the static, title-vetted recipe catalog.
-      // If a recipe is not in the catalog, RecipeImage shows a neutral placeholder.
+      // Catalog images win; otherwise look up the photo on the recipe's own page.
+      const needs = recipes.filter((r) => !r.image && r.sourceUrl).map((r) => r.sourceUrl!);
+      if (needs.length) {
+        const { resolveRecipeImages } = await import("./recipe-images.server");
+        const found = await Promise.race([
+          resolveRecipeImages(needs, 6),
+          new Promise<Record<string, string>>((res) => setTimeout(() => res({}), 8000)),
+        ]);
+        for (const r of recipes) {
+          const img = r.sourceUrl ? found[r.sourceUrl] : undefined;
+          if (!r.image && img) {
+            r.image = img;
+            r.imageUrl = img;
+          }
+        }
+      }
 
       return { recipes, error: null };
     } catch (error) {

@@ -29,7 +29,9 @@ function clampItem(raw: Record<string, unknown>): ScanItem | null {
     quantityEstimate: Number.isFinite(quantity) ? Math.max(0.1, Math.min(quantity, 5000)) : 1,
     unit,
     confidence: Number.isFinite(confidence) ? Math.max(0.2, Math.min(confidence, 0.99)) : 0.6,
-    ...(Number.isFinite(useSoonDays) ? { useSoonDays: Math.max(0, Math.min(30, Math.round(useSoonDays))) } : {}),
+    ...(Number.isFinite(useSoonDays)
+      ? { useSoonDays: Math.max(0, Math.min(30, Math.round(useSoonDays))) }
+      : {}),
   };
 }
 
@@ -147,8 +149,13 @@ export const Route = createFileRoute("/api/scan-pantry")({
 
         try {
           const parsed = JSON.parse(content) as { items?: Record<string, unknown>[] };
-          const items = (parsed.items ?? []).map(clampItem).filter((item): item is ScanItem => item !== null);
-          if (!items.length) return new Response("No clear foods were detected. Try a closer photo.", { status: 422 });
+          const items = (parsed.items ?? [])
+            .map(clampItem)
+            .filter((item): item is ScanItem => item !== null);
+          if (!items.length)
+            return new Response("No clear foods were detected. Try a closer photo.", {
+              status: 422,
+            });
           return Response.json({ items });
         } catch (error) {
           console.error("pantry scan parse error", error);

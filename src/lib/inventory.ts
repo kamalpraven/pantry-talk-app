@@ -169,7 +169,11 @@ function unitFromLine(line: string, fallback: PantryUnit): PantryUnit {
   const lower = line.toLowerCase();
   if (/\b(?:g|gram|grams)\b/.test(lower)) return "g";
   if (/\b(?:ml|millilitre|millilitres|milliliter|milliliters)\b/.test(lower)) return "ml";
-  if (/\b(?:egg|eggs|tomato|tomatoes|avocado|avocados|lemon|lemons|onion|onions|slice|slices|clove|cloves)\b/.test(lower)) {
+  if (
+    /\b(?:egg|eggs|tomato|tomatoes|avocado|avocados|lemon|lemons|onion|onions|slice|slices|clove|cloves)\b/.test(
+      lower,
+    )
+  ) {
     return "count";
   }
   return fallback;
@@ -244,7 +248,9 @@ export function applyConsumption(
 }
 
 export function formatPantryQuantity(quantity: number, unit: PantryUnit) {
-  const rounded = Number.isInteger(quantity) ? String(quantity) : quantity.toFixed(1).replace(/\.0$/, "");
+  const rounded = Number.isInteger(quantity)
+    ? String(quantity)
+    : quantity.toFixed(1).replace(/\.0$/, "");
   if (unit === "g" || unit === "ml") return `${rounded} ${unit}`;
   if (unit === "count") return rounded;
   return `${rounded} portion${quantity === 1 ? "" : "s"}`;

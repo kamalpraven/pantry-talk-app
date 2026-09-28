@@ -82,7 +82,8 @@ function findRecipeImage(value: unknown): string | null {
 }
 
 function recipeJsonLdImage(html: string, pageUrl: string): string | null {
-  const scriptPattern = /<script[^>]+type=["']application\/ld\+json["'][^>]*>([\s\S]*?)<\/script>/gi;
+  const scriptPattern =
+    /<script[^>]+type=["']application\/ld\+json["'][^>]*>([\s\S]*?)<\/script>/gi;
   let match: RegExpExecArray | null;
   while ((match = scriptPattern.exec(html))) {
     const raw = match[1]?.trim();

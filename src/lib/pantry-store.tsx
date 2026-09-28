@@ -110,7 +110,9 @@ export function PantryProvider({ children }: { children: ReactNode }) {
       setTimeLimit,
       setGoals,
       toggleGoal: (goal: DietGoal) =>
-        setGoals((prev) => (prev.includes(goal) ? prev.filter((g) => g !== goal) : [...prev, goal])),
+        setGoals((prev) =>
+          prev.includes(goal) ? prev.filter((g) => g !== goal) : [...prev, goal],
+        ),
       setIngredients: (values: string[]) => {
         const clean = values.map((value) => value.trim()).filter(Boolean);
         setPantryItems((prev) =>
@@ -151,8 +153,11 @@ export function PantryProvider({ children }: { children: ReactNode }) {
       loadScannedKitchen: (items: ScannedPantryItem[]) => {
         const next = items
           .map(scannedPantryItem)
-          .filter((item, index, all) =>
-            all.findIndex((candidate) => candidate.name.toLowerCase() === item.name.toLowerCase()) === index,
+          .filter(
+            (item, index, all) =>
+              all.findIndex(
+                (candidate) => candidate.name.toLowerCase() === item.name.toLowerCase(),
+              ) === index,
           );
         setPantryItems(next);
         setInventoryEvents(

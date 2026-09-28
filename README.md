@@ -27,6 +27,18 @@ npm run dev
 - TypeScript
 - React
 - Tailwind CSS
+- Supabase Auth/Postgres
+
+## Supabase auth/profile setup
+
+1. Create a Supabase project.
+2. Run `supabase/migrations/001_auth_profile_foundation.sql` in the SQL editor or via the Supabase CLI.
+3. Copy `.env.example` to `.env.local` and set:
+   - `VITE_SUPABASE_URL`
+   - `VITE_SUPABASE_ANON_KEY`
+   - optional server-only `SUPABASE_SERVICE_ROLE_KEY`
+4. In Supabase Auth providers, enable Email and Magic Link. Enable Google OAuth when client credentials are ready. Apple OAuth is intentionally scaffolded for later provider activation.
+5. Add local redirect URLs such as `http://localhost:5173/account` and `http://localhost:5173/reset-password` to Supabase Auth URL configuration.
 
 ## Static recipe catalog
 

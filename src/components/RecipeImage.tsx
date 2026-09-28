@@ -4,12 +4,16 @@ import type { Recipe } from "@/lib/recipes";
 
 function displaySrc(raw: string): string {
   // Remote photos go through the app so sites that block hotlinking still work.
-  return /^https:\/\//.test(raw)
-    ? `/api/public/recipe-image?url=${encodeURIComponent(raw)}`
-    : raw;
+  return /^https:\/\//.test(raw) ? `/api/public/recipe-image?url=${encodeURIComponent(raw)}` : raw;
 }
 
-function RecipePlaceholder({ recipe, className }: { recipe: Recipe; className?: string | undefined }) {
+function RecipePlaceholder({
+  recipe,
+  className,
+}: {
+  recipe: Recipe;
+  className?: string | undefined;
+}) {
   return (
     <div
       className={`relative flex items-center justify-center overflow-hidden bg-gradient-to-br from-secondary via-background to-accent ${className ?? ""}`}
@@ -21,7 +25,9 @@ function RecipePlaceholder({ recipe, className }: { recipe: Recipe; className?: 
         <span className="flex size-14 items-center justify-center rounded-full bg-background/80 shadow-sm">
           <ChefHat className="size-7 text-primary" aria-hidden />
         </span>
-        <span className="text-sm font-semibold text-muted-foreground">Recipe photo unavailable</span>
+        <span className="text-sm font-semibold text-muted-foreground">
+          Recipe photo unavailable
+        </span>
       </div>
     </div>
   );

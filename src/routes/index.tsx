@@ -1,6 +1,17 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useState } from "react";
-import { Mic, Plus, X, Loader2, Sparkles, Square, Check, PackageOpen, Clock3, Camera } from "lucide-react";
+import {
+  Mic,
+  Plus,
+  X,
+  Loader2,
+  Sparkles,
+  Square,
+  Check,
+  PackageOpen,
+  Clock3,
+  Camera,
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { usePantry } from "@/lib/pantry-store";
@@ -133,7 +144,8 @@ function IngredientInput() {
         throw new Error(message || "I couldn't read that kitchen photo.");
       }
       const payload = (await response.json()) as { items?: ScannedPantryItem[] };
-      if (!payload.items?.length) throw new Error("No clear foods were detected. Try a closer photo.");
+      if (!payload.items?.length)
+        throw new Error("No clear foods were detected. Try a closer photo.");
       loadScannedKitchen(payload.items);
       trackEvent("pantry_scan_completed", { itemCount: payload.items.length });
     } catch (err) {
@@ -187,11 +199,15 @@ function IngredientInput() {
 
         <div className="mt-6 flex w-full max-w-md items-center gap-3">
           <div className="h-px flex-1 bg-border" />
-          <span className="text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground">or</span>
+          <span className="text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground">
+            or
+          </span>
           <div className="h-px flex-1 bg-border" />
         </div>
 
-        <label className={`mt-5 inline-flex min-h-12 cursor-pointer items-center justify-center gap-2 rounded-full border border-primary/30 bg-card px-5 text-sm font-semibold text-foreground shadow-card transition-colors hover:bg-accent ${scanPhase === "working" ? "pointer-events-none opacity-70" : ""}`}>
+        <label
+          className={`mt-5 inline-flex min-h-12 cursor-pointer items-center justify-center gap-2 rounded-full border border-primary/30 bg-card px-5 text-sm font-semibold text-foreground shadow-card transition-colors hover:bg-accent ${scanPhase === "working" ? "pointer-events-none opacity-70" : ""}`}
+        >
           {scanPhase === "working" ? (
             <Loader2 className="size-4 animate-spin text-primary" aria-hidden />
           ) : (
@@ -295,7 +311,9 @@ function IngredientInput() {
           <div className="mt-6">
             <div className="flex items-end justify-between gap-4">
               <div>
-                <p className="text-sm font-semibold tracking-wide text-foreground uppercase">Kitchen state</p>
+                <p className="text-sm font-semibold tracking-wide text-foreground uppercase">
+                  Kitchen state
+                </p>
                 <p className="mt-1 text-sm text-muted-foreground">
                   Pantry Talk keeps an estimate instead of asking for a perfect inventory.
                 </p>
@@ -311,7 +329,8 @@ function IngredientInput() {
                     <div>
                       <p className="font-semibold">{item.name}</p>
                       <p className="mt-1 text-sm text-muted-foreground">
-                        ~{formatPantryQuantity(item.quantityEstimate, item.unit)} · {Math.round(item.confidence * 100)}% confidence
+                        ~{formatPantryQuantity(item.quantityEstimate, item.unit)} ·{" "}
+                        {Math.round(item.confidence * 100)}% confidence
                       </p>
                     </div>
                     {item.useSoonDays != null && item.useSoonDays <= 3 && (
@@ -340,8 +359,8 @@ function IngredientInput() {
         <section className="mt-8 rounded-3xl border border-primary/25 bg-card p-5 shadow-card sm:p-7">
           <h2 className="text-xl">What are you in the mood for?</h2>
           <p className="mt-2 text-sm text-muted-foreground">
-            Say something like &ldquo;something high protein under twenty minutes&rdquo; — or just tap
-            the buttons below.
+            Say something like &ldquo;something high protein under twenty minutes&rdquo; — or just
+            tap the buttons below.
           </p>
           <div className="mt-4 flex flex-wrap items-center gap-3">
             <Button

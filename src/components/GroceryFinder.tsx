@@ -18,7 +18,9 @@ export function GroceryFinder({ missing }: { missing: string[] }) {
   const [loading, setLoading] = useState(false);
   const [stores, setStores] = useState<GroceryStore[]>([]);
   const [error, setError] = useState<string | null>(null);
-  const [searched, setSearched] = useState<{ kind: "zip" | "address"; location: string } | null>(null);
+  const [searched, setSearched] = useState<{ kind: "zip" | "address"; location: string } | null>(
+    null,
+  );
   const [selected, setSelected] = useState<string | null>(null);
 
   async function run() {

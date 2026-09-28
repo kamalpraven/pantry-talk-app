@@ -1,5 +1,11 @@
 import { createServerFn } from "@tanstack/react-start";
-import { DIET_GOALS, TIME_LIMITS, type DietGoal, type MealPreference, type TimeLimit } from "./recipes";
+import {
+  DIET_GOALS,
+  TIME_LIMITS,
+  type DietGoal,
+  type MealPreference,
+  type TimeLimit,
+} from "./recipes";
 
 export type ParsedPreferences = {
   timeLimit: TimeLimit;
@@ -7,7 +13,15 @@ export type ParsedPreferences = {
   preference: MealPreference;
 };
 
-const MEALS: MealPreference[] = ["Anything", "Quick", "High Protein", "Healthy", "Breakfast", "Lunch", "Dinner"];
+const MEALS: MealPreference[] = [
+  "Anything",
+  "Quick",
+  "High Protein",
+  "Healthy",
+  "Breakfast",
+  "Lunch",
+  "Dinner",
+];
 
 /** Keyword fallback used when the AI call fails or returns nothing usable. */
 export function parsePreferencesLocally(text: string): ParsedPreferences {
@@ -20,7 +34,14 @@ export function parsePreferencesLocally(text: string): ParsedPreferences {
   if (/gluten.?free|no gluten/.test(value)) goals.push("Gluten Free");
 
   const words: Record<string, number> = {
-    ten: 10, twelve: 12, fifteen: 15, twenty: 20, "twenty five": 25, thirty: 30, forty: 40, sixty: 60,
+    ten: 10,
+    twelve: 12,
+    fifteen: 15,
+    twenty: 20,
+    "twenty five": 25,
+    thirty: 30,
+    forty: 40,
+    sixty: 60,
   };
   let minutes: number | null = null;
   const digits = /(\d+)\s*(?:minute|minutes|min|mins)/.exec(value);
@@ -36,7 +57,8 @@ export function parsePreferencesLocally(text: string): ParsedPreferences {
   if (minutes === null && /quick|fast|hurry|rush/.test(value)) minutes = 15;
 
   let timeLimit: TimeLimit = "No rush";
-  if (minutes !== null) timeLimit = minutes <= 15 ? "Under 15 min" : minutes <= 30 ? "Under 30 min" : "No rush";
+  if (minutes !== null)
+    timeLimit = minutes <= 15 ? "Under 15 min" : minutes <= 30 ? "Under 30 min" : "No rush";
 
   let preference: MealPreference = "Anything";
   if (/breakfast|morning/.test(value)) preference = "Breakfast";
@@ -102,7 +124,11 @@ export const interpretPreferences = createServerFn({ method: "POST" })
       });
 
       if (!response.ok) {
-        console.error("preference parsing failed", response.status, await response.text().catch(() => ""));
+        console.error(
+          "preference parsing failed",
+          response.status,
+          await response.text().catch(() => ""),
+        );
         return fallback;
       }
 

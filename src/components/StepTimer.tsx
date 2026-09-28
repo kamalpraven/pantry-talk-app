@@ -7,7 +7,13 @@ import type { CookingTimer } from "@/lib/use-cooking-timer";
  * Presentational timer panel. All state lives in `useCookingTimer` so spoken
  * commands and the buttons drive exactly the same timer.
  */
-export function StepTimer({ timer, stepSeconds }: { timer: CookingTimer; stepSeconds: number | null }) {
+export function StepTimer({
+  timer,
+  stepSeconds,
+}: {
+  timer: CookingTimer;
+  stepSeconds: number | null;
+}) {
   if (!timer.active) {
     if (stepSeconds === null) return null;
     return (

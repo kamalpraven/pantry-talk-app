@@ -14,13 +14,7 @@ import tomatoCheddarToast from "@/assets/tomato-cheddar-toast.jpg";
  */
 
 export type MealPreference =
-  | "Anything"
-  | "Quick"
-  | "High Protein"
-  | "Healthy"
-  | "Breakfast"
-  | "Lunch"
-  | "Dinner";
+  "Anything" | "Quick" | "High Protein" | "Healthy" | "Breakfast" | "Lunch" | "Dinner";
 
 export const MEAL_PREFERENCES: MealPreference[] = [
   "Anything",
@@ -53,13 +47,7 @@ export const DIET_GOALS: DietGoal[] = [
 ];
 
 /** Assumed to always be in the kitchen — never counted as missing. */
-export const ASSUMED_STAPLES = [
-  "Olive oil",
-  "Salt",
-  "Black pepper",
-  "Water",
-  "Dried spices",
-];
+export const ASSUMED_STAPLES = ["Olive oil", "Salt", "Black pepper", "Water", "Dried spices"];
 
 const STAPLE_MATCHERS = [
   "oil",
@@ -91,7 +79,6 @@ export type Nutrition = {
   fat?: number;
 };
 
-
 export type Recipe = {
   id: string;
   name: string;
@@ -116,7 +103,6 @@ export type Recipe = {
   sourceUrl?: string;
   sourceName?: string;
 };
-
 
 /** Practical swaps — suggestions, never guaranteed equivalents. */
 export const SUBSTITUTIONS: Record<string, string> = {
@@ -342,7 +328,6 @@ export function findRecipes(
   const limit = TIME_LIMIT_MINUTES[filters.timeLimit];
   const base = pool.map((recipe) => matchRecipe(recipe, pantry));
 
-
   const qualifying = base.filter((m) => m.recipe.timeMinutes <= limit);
   const topProtein = qualifying
     .slice()
@@ -357,13 +342,7 @@ export function findRecipes(
       ...m,
       fitsTime,
       labels,
-      reason: buildReason(
-        m,
-        pantry,
-        filters,
-        fitsTime,
-        topProtein?.recipe.id === m.recipe.id,
-      ),
+      reason: buildReason(m, pantry, filters, fitsTime, topProtein?.recipe.id === m.recipe.id),
     };
   });
 
@@ -459,7 +438,6 @@ export function formatSpokenTime(seconds: number) {
   if (s) parts.push(`${s} second${s === 1 ? "" : "s"}`);
   return parts.join(" and ") || "no time";
 }
-
 
 export function timerLabel(seconds: number) {
   if (seconds % 60 === 0) {

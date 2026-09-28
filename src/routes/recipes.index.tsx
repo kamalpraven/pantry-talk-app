@@ -87,7 +87,8 @@ function RecipeResults() {
 
       <h1 className="mt-5 text-3xl sm:text-4xl">Three dinners worth cooking</h1>
       <p className="mt-3 text-base text-muted-foreground">
-        Based on {ingredients.length ? ingredients.join(" · ") : "your pantry"} — {timeLimit.toLowerCase()}
+        Based on {ingredients.length ? ingredients.join(" · ") : "your pantry"} —{" "}
+        {timeLimit.toLowerCase()}
         {goals.length ? `, ${goals.join(", ").toLowerCase()}` : ""}.
       </p>
 
@@ -102,7 +103,10 @@ function RecipeResults() {
       )}
 
       {!isFetching && usingFallback && ingredients.length > 0 && (
-        <p className="mt-6 rounded-2xl bg-secondary p-4 text-base text-muted-foreground" role="status">
+        <p
+          className="mt-6 rounded-2xl bg-secondary p-4 text-base text-muted-foreground"
+          role="status"
+        >
           Live recipe search is unavailable, so here are some suggestions based on your ingredients.
         </p>
       )}
@@ -227,7 +231,9 @@ function RecipeResults() {
                   <Link
                     to="/recipes/$recipeId"
                     params={{ recipeId: recipe.id }}
-                    onClick={() => trackEvent("meal_selected", { recipeId: recipe.id, matchPercent })}
+                    onClick={() =>
+                      trackEvent("meal_selected", { recipeId: recipe.id, matchPercent })
+                    }
                   >
                     Cook this
                   </Link>

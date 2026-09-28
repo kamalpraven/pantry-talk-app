@@ -1,36 +1,40 @@
-import { RECIPE_CATALOG, type RecipeCatalogEntry } from '@/data/recipe-catalog.generated';
+import { RECIPE_CATALOG, type RecipeCatalogEntry } from "@/data/recipe-catalog.generated";
 
 const PANTRY_STAPLES = new Set([
-  'water',
-  'salt',
-  'black pepper',
-  'pepper',
-  'olive oil',
-  'vegetable oil',
-  'oil',
+  "water",
+  "salt",
+  "black pepper",
+  "pepper",
+  "olive oil",
+  "vegetable oil",
+  "oil",
 ]);
 
 function normalizeText(value: string) {
   return value
-    .normalize('NFKD')
-    .replace(/[\u0300-\u036f]/g, '')
+    .normalize("NFKD")
+    .replace(/[\u0300-\u036f]/g, "")
     .toLowerCase()
-    .replace(/\b(recipe|style|easy|classic|homemade|best|fresh|large|small|medium)\b/g, ' ')
-    .replace(/[^a-z0-9]+/g, ' ')
+    .replace(/\b(recipe|style|easy|classic|homemade|best|fresh|large|small|medium)\b/g, " ")
+    .replace(/[^a-z0-9]+/g, " ")
     .trim()
-    .replace(/\s+/g, ' ');
+    .replace(/\s+/g, " ");
 }
 
 function singularish(value: string) {
   const n = normalizeText(value);
-  if (n.endsWith('ies') && n.length > 4) return `${n.slice(0, -3)}y`;
-  if (n.endsWith('oes') && n.length > 4) return n.slice(0, -2);
-  if (n.endsWith('s') && !n.endsWith('ss') && n.length > 3) return n.slice(0, -1);
+  if (n.endsWith("ies") && n.length > 4) return `${n.slice(0, -3)}y`;
+  if (n.endsWith("oes") && n.length > 4) return n.slice(0, -2);
+  if (n.endsWith("s") && !n.endsWith("ss") && n.length > 3) return n.slice(0, -1);
   return n;
 }
 
 function tokens(value: string) {
-  return new Set(normalizeText(value).split(' ').filter((token) => token.length > 1));
+  return new Set(
+    normalizeText(value)
+      .split(" ")
+      .filter((token) => token.length > 1),
+  );
 }
 
 function jaccard(a: Set<string>, b: Set<string>) {
@@ -109,9 +113,13 @@ export function findCatalogCandidates(pantry: string[], limit = 10): CatalogCand
     );
     if (!meaningful.length) continue;
 
-    const matched = meaningful.filter((ingredient) => ingredientMatchesPantry(ingredient, pantryClean));
+    const matched = meaningful.filter((ingredient) =>
+      ingredientMatchesPantry(ingredient, pantryClean),
+    );
     if (!matched.length) continue;
-    const missing = meaningful.filter((ingredient) => !ingredientMatchesPantry(ingredient, pantryClean));
+    const missing = meaningful.filter(
+      (ingredient) => !ingredientMatchesPantry(ingredient, pantryClean),
+    );
     const matchPercent = Math.round((matched.length / meaningful.length) * 100);
 
     // Several pantry hits matter more than a superficially high percentage on a tiny recipe.

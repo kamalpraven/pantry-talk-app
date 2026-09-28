@@ -195,7 +195,11 @@ function RecipeDetail() {
             </ol>
           </section>
 
-          <Button asChild size="lg" className="mt-10 h-16 w-full rounded-full text-lg font-semibold">
+          <Button
+            asChild
+            size="lg"
+            className="mt-10 h-16 w-full rounded-full text-lg font-semibold"
+          >
             <Link
               to="/cook/$recipeId"
               params={{ recipeId: recipe.id }}

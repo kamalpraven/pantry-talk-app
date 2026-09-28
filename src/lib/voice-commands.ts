@@ -39,7 +39,9 @@ const NUMBER_WORDS: Record<string, number> = {
 /** "start a timer for three minutes" → 180 */
 export function parseSpokenDuration(text: string): number | null {
   const value = text.toLowerCase();
-  const digits = /(\d+(?:\.\d+)?)\s*(minute|minutes|min|mins|second|seconds|sec|secs)\b/.exec(value);
+  const digits = /(\d+(?:\.\d+)?)\s*(minute|minutes|min|mins|second|seconds|sec|secs)\b/.exec(
+    value,
+  );
   if (digits?.[1]) {
     const amount = Number(digits[1]);
     return (digits[2] ?? "").startsWith("sec") ? Math.round(amount) : Math.round(amount * 60);
@@ -57,7 +59,11 @@ export function parseSpokenDuration(text: string): number | null {
 }
 
 export function parseCommand(raw: string): VoiceCommand {
-  const text = raw.toLowerCase().replace(/[.!?,]/g, " ").replace(/\s+/g, " ").trim();
+  const text = raw
+    .toLowerCase()
+    .replace(/[.!?,]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
   if (!text) return { kind: "unknown" };
 
   // Questions and timer phrases first — they often contain words like "next".
@@ -78,7 +84,8 @@ export function parseCommand(raw: string): VoiceCommand {
   if (quantity?.[1]) return { kind: "ingredient", query: quantity[1].trim() };
 
   if (/(previous|go back|back a step|last step|before)/.test(text)) return { kind: "previous" };
-  if (/(repeat|again|say that|what did you say|one more time)/.test(text)) return { kind: "repeat" };
+  if (/(repeat|again|say that|what did you say|one more time)/.test(text))
+    return { kind: "repeat" };
   if (/(next|continue|carry on|move on|go on|done|finished|got it|ready)/.test(text))
     return { kind: "next" };
 
@@ -99,7 +106,8 @@ export function answerFor(command: VoiceCommand, ctx: Context): string {
 
   switch (command.kind) {
     case "timeLeft":
-      if (!ctx.timerActive || ctx.remainingSeconds === null) return "No timer is running right now.";
+      if (!ctx.timerActive || ctx.remainingSeconds === null)
+        return "No timer is running right now.";
       if (ctx.remainingSeconds <= 0) return "The timer has finished.";
       return `You have ${formatSpokenTime(ctx.remainingSeconds)} remaining.`;
     case "currentStep":
@@ -109,7 +117,9 @@ export function answerFor(command: VoiceCommand, ctx: Context): string {
       return next ? `Next up: ${next}` : "That was the last step — you're done.";
     }
     case "temperature": {
-      const step = recipe.steps.find((s) => /degrees|°|medium|high heat|low heat|grill|oven/i.test(s));
+      const step = recipe.steps.find((s) =>
+        /degrees|°|medium|high heat|low heat|grill|oven/i.test(s),
+      );
       return step ? step : "This recipe doesn't give a temperature.";
     }
     case "ingredient": {

@@ -90,7 +90,10 @@ function slug(value) {
 
 function cleanText(value) {
   return typeof value === "string"
-    ? value.replace(/<[^>]*>/g, "").replace(/\s+/g, " ").trim()
+    ? value
+        .replace(/<[^>]*>/g, "")
+        .replace(/\s+/g, " ")
+        .trim()
     : "";
 }
 
@@ -352,13 +355,17 @@ async function main() {
     `Attempting image download for ${selectedCandidates.length} candidates with concurrency=${CONCURRENCY}`,
   );
 
-  const downloaded = await mapConcurrent(selectedCandidates, CONCURRENCY, async (candidate, index) => {
-    const result = await downloadImage(candidate);
-    if ((index + 1) % 50 === 0) {
-      console.log(`Processed ${index + 1} / ${selectedCandidates.length} images`);
-    }
-    return result;
-  });
+  const downloaded = await mapConcurrent(
+    selectedCandidates,
+    CONCURRENCY,
+    async (candidate, index) => {
+      const result = await downloadImage(candidate);
+      if ((index + 1) % 50 === 0) {
+        console.log(`Processed ${index + 1} / ${selectedCandidates.length} images`);
+      }
+      return result;
+    },
+  );
 
   const entries = downloaded.filter(Boolean).slice(0, TARGET_COUNT);
   if (entries.length < TARGET_COUNT) {

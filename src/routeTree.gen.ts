@@ -10,6 +10,7 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as ApiScanPantryRouteImport } from './routes/api/scan-pantry'
 import { Route as ApiSpeakRouteImport } from './routes/api/speak'
 import { Route as ApiTranscribeRouteImport } from './routes/api/transcribe'
 import { Route as CookRecipeIdRouteImport } from './routes/cook.$recipeId'
@@ -20,6 +21,11 @@ import { Route as ApiPublicRecipeImageRouteImport } from './routes/api/public/re
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiScanPantryRoute = ApiScanPantryRouteImport.update({
+  id: '/api/scan-pantry',
+  path: '/api/scan-pantry',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ApiSpeakRoute = ApiSpeakRouteImport.update({
@@ -55,6 +61,7 @@ const ApiPublicRecipeImageRoute = ApiPublicRecipeImageRouteImport.update({
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/api/scan-pantry': typeof ApiScanPantryRoute
   '/api/speak': typeof ApiSpeakRoute
   '/api/transcribe': typeof ApiTranscribeRoute
   '/cook/$recipeId': typeof CookRecipeIdRoute
@@ -64,6 +71,7 @@ export interface FileRoutesByFullPath {
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/api/scan-pantry': typeof ApiScanPantryRoute
   '/api/speak': typeof ApiSpeakRoute
   '/api/transcribe': typeof ApiTranscribeRoute
   '/cook/$recipeId': typeof CookRecipeIdRoute
@@ -74,6 +82,7 @@ export interface FileRoutesByTo {
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/api/scan-pantry': typeof ApiScanPantryRoute
   '/api/speak': typeof ApiSpeakRoute
   '/api/transcribe': typeof ApiTranscribeRoute
   '/cook/$recipeId': typeof CookRecipeIdRoute
@@ -85,6 +94,7 @@ export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
     | '/'
+    | '/api/scan-pantry'
     | '/api/speak'
     | '/api/transcribe'
     | '/cook/$recipeId'
@@ -94,6 +104,7 @@ export interface FileRouteTypes {
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
+    | '/api/scan-pantry'
     | '/api/speak'
     | '/api/transcribe'
     | '/cook/$recipeId'
@@ -103,6 +114,7 @@ export interface FileRouteTypes {
   id:
     | '__root__'
     | '/'
+    | '/api/scan-pantry'
     | '/api/speak'
     | '/api/transcribe'
     | '/cook/$recipeId'
@@ -113,6 +125,7 @@ export interface FileRouteTypes {
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  ApiScanPantryRoute: typeof ApiScanPantryRoute
   ApiSpeakRoute: typeof ApiSpeakRoute
   ApiTranscribeRoute: typeof ApiTranscribeRoute
   CookRecipeIdRoute: typeof CookRecipeIdRoute
@@ -128,6 +141,13 @@ declare module '@tanstack/react-router' {
       path: '/'
       fullPath: '/'
       preLoaderRoute: typeof IndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/scan-pantry': {
+      id: '/api/scan-pantry'
+      path: '/api/scan-pantry'
+      fullPath: '/api/scan-pantry'
+      preLoaderRoute: typeof ApiScanPantryRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/speak': {
@@ -177,6 +197,7 @@ declare module '@tanstack/react-router' {
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  ApiScanPantryRoute: ApiScanPantryRoute,
   ApiSpeakRoute: ApiSpeakRoute,
   ApiTranscribeRoute: ApiTranscribeRoute,
   CookRecipeIdRoute: CookRecipeIdRoute,

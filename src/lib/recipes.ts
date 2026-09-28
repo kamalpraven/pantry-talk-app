@@ -166,6 +166,7 @@ export const RECIPES: Recipe[] = [
     keyIngredients: ["Avocado", "Eggs", "Bread", "Lemon", "Tomatoes"],
     essentialIngredients: ["Avocado", "Eggs"],
     staples: ["Salt", "Black pepper", "Olive oil"],
+    ingredientLines: ["2 Eggs", "1 Avocado", "2 slices Bread", "1 Lemon", "1 Tomato"],
     steps: [
       "Bring a small pot of water to a gentle simmer and toast two slices of bread until golden.",
       "Mash the avocado with lemon juice, salt and black pepper until creamy but still chunky.",
@@ -188,6 +189,7 @@ export const RECIPES: Recipe[] = [
     keyIngredients: ["Eggs", "Cheddar", "Tomatoes"],
     essentialIngredients: ["Eggs", "Cheddar"],
     staples: ["Olive oil", "Salt", "Black pepper"],
+    ingredientLines: ["3 Eggs", "60 g Cheddar", "2 Tomatoes"],
     steps: [
       "Beat three eggs with a pinch of salt and pepper until fully combined.",
       "Warm a little olive oil in a non-stick pan over medium heat.",
@@ -210,6 +212,7 @@ export const RECIPES: Recipe[] = [
     keyIngredients: ["Eggs", "Bread", "Lemon", "Mayonnaise"],
     essentialIngredients: ["Eggs"],
     staples: ["Salt", "Black pepper"],
+    ingredientLines: ["4 Eggs", "4 slices Bread", "1 Lemon", "60 g Mayonnaise"],
     steps: [
       "Hard boil four eggs for 9 minutes, then cool them under cold running water.",
       "Peel and roughly chop the eggs into a bowl.",
@@ -231,6 +234,7 @@ export const RECIPES: Recipe[] = [
     keyIngredients: ["Tomatoes", "Eggs", "Bread", "Onion"],
     essentialIngredients: ["Tomatoes", "Eggs"],
     staples: ["Olive oil", "Dried spices", "Salt", "Black pepper"],
+    ingredientLines: ["3 Tomatoes", "4 Eggs", "2 slices Bread", "1 Onion"],
     steps: [
       "Warm olive oil in a skillet and soften the sliced onion for 5 minutes.",
       "Stir in your dried spices — paprika and cumin work well — and cook 30 seconds.",
@@ -253,6 +257,7 @@ export const RECIPES: Recipe[] = [
     keyIngredients: ["Bread", "Tomatoes", "Cheddar"],
     essentialIngredients: ["Bread", "Cheddar"],
     staples: ["Olive oil", "Salt", "Black pepper"],
+    ingredientLines: ["2 slices Bread", "1 Tomato", "50 g Cheddar"],
     steps: [
       "Heat the grill or a toaster oven to high.",
       "Toast the bread on one side only, then flip it over.",

@@ -11,8 +11,11 @@ import {
   Loader2,
   Volume2,
   Ear,
+  Sparkles,
+  Minus,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { StepTimer } from "@/components/StepTimer";
 import { lookupRecipe } from "@/lib/recipe-cache";
 import { formatSpokenTime, stepTimerSeconds } from "@/lib/recipes";
@@ -20,6 +23,9 @@ import { speakAloud, startRecording, stopSpeaking, transcribeAudio, type Recorde
 import { answerFor, parseCommand } from "@/lib/voice-commands";
 import { playChime, useCookingTimer } from "@/lib/use-cooking-timer";
 import { useVibe } from "@/lib/vibe-store";
+import { usePantry, type ConsumptionEstimate } from "@/lib/pantry-store";
+import { formatPantryQuantity } from "@/lib/inventory";
+import { trackEvent } from "@/lib/analytics";
 
 export const Route = createFileRoute("/cook/$recipeId")({
   head: () => ({
@@ -51,6 +57,7 @@ function CookingMode() {
   const recipe = hydrated ? lookupRecipe(recipeId) : undefined;
   const navigate = useNavigate();
   const { muted, duck, unduck } = useVibe();
+  const { pantryItems, previewConsumption, applyConsumption } = usePantry();
 
   const [index, setIndex] = useState(0);
   const [speaking, setSpeaking] = useState(false);
@@ -58,6 +65,9 @@ function CookingMode() {
   const [handsFree, setHandsFree] = useState(false);
   const [heard, setHeard] = useState<string | null>(null);
   const [note, setNote] = useState<string | null>(null);
+  const [completionOpen, setCompletionOpen] = useState(false);
+  const [completionUpdated, setCompletionUpdated] = useState(false);
+  const [consumptionDraft, setConsumptionDraft] = useState<ConsumptionEstimate[]>([]);
   const recorderRef = useRef<Recorder | null>(null);
   const spokenStep = useRef<number | null>(null);
 
@@ -196,6 +206,26 @@ function CookingMode() {
     return () => window.clearTimeout(id);
   }, [handsFree, speaking, micPhase, toggleMic]);
 
+  function finishCooking() {
+    if (!recipe) return;
+    stopSpeaking();
+    setHandsFree(false);
+    const estimates = previewConsumption(recipe);
+    setConsumptionDraft(estimates);
+    trackEvent("meal_completed", { recipeId: recipe.id, trackedIngredients: estimates.length });
+    setCompletionUpdated(false);
+    setCompletionOpen(true);
+  }
+
+  function confirmConsumption() {
+    if (!recipe) return;
+    const confirmed = consumptionDraft.filter((item) => item.quantity > 0);
+    applyConsumption(recipe, confirmed);
+    trackEvent("inventory_update_confirmed", { recipeId: recipe.id, updatedIngredients: confirmed.length });
+    setCompletionUpdated(true);
+    void speak("Kitchen updated. Your next meal recommendations are already smarter.");
+  }
+
   if (!recipe) {
     if (!hydrated) return <main className="min-h-screen" />;
     return (
@@ -204,6 +234,143 @@ function CookingMode() {
         <Button asChild className="mt-6 h-14 rounded-full px-6 text-base">
           <Link to="/recipes">Back to recipes</Link>
         </Button>
+      </main>
+    );
+  }
+
+  if (completionOpen) {
+    return (
+      <main className="min-h-screen px-5 pt-24 pb-12 sm:px-8">
+        <div className="mx-auto w-full max-w-2xl">
+          <button
+            type="button"
+            onClick={() => setCompletionOpen(false)}
+            className="inline-flex items-center gap-2 text-sm font-semibold text-muted-foreground transition-colors hover:text-foreground"
+          >
+            <ArrowLeft className="size-4" aria-hidden />
+            Back to cooking
+          </button>
+
+          {!completionUpdated ? (
+            <>
+              <div className="mt-10 text-center">
+                <div className="mx-auto flex size-16 items-center justify-center rounded-full bg-accent text-accent-foreground">
+                  <Check className="size-8" aria-hidden />
+                </div>
+                <h1 className="mt-5 text-4xl">Dinner&rsquo;s done.</h1>
+                <p className="mx-auto mt-3 max-w-lg text-base text-muted-foreground">
+                  Pantry Talk estimates what left your kitchen from this recipe. Confirm or adjust it before the pantry updates.
+                </p>
+              </div>
+
+              <section className="mt-8 rounded-3xl border border-border bg-card p-5 shadow-card sm:p-7">
+                <p className="flex items-center gap-2 text-sm font-semibold uppercase tracking-wide">
+                  <Sparkles className="size-4 text-primary" aria-hidden />
+                  Pantry Talk thinks you used
+                </p>
+
+                {consumptionDraft.length ? (
+                  <ul className="mt-5 space-y-3">
+                    {consumptionDraft.map((item, itemIndex) => (
+                      <li key={item.pantryItemId} className="flex items-center justify-between gap-4 rounded-2xl bg-secondary p-4">
+                        <div>
+                          <p className="font-semibold">{item.name}</p>
+                          <p className="mt-1 text-xs text-muted-foreground">
+                            {Math.round(item.confidence * 100)}% estimate confidence
+                          </p>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <Minus className="size-4 text-primary" aria-hidden />
+                          <Input
+                            type="number"
+                            min={0}
+                            step={item.unit === "count" ? 1 : 5}
+                            value={item.quantity}
+                            onChange={(event) => {
+                              const quantity = Math.max(0, Number(event.target.value) || 0);
+                              setConsumptionDraft((current) =>
+                                current.map((candidate, index) =>
+                                  index === itemIndex ? { ...candidate, quantity } : candidate,
+                                ),
+                              );
+                            }}
+                            aria-label={`Amount of ${item.name} used`}
+                            className="h-10 w-24 rounded-full bg-card text-right"
+                          />
+                          <span className="w-10 text-sm font-semibold text-muted-foreground">
+                            {item.unit === "count" ? "items" : item.unit}
+                          </span>
+                        </div>
+                      </li>
+                    ))}
+                  </ul>
+                ) : (
+                  <p className="mt-4 rounded-2xl bg-secondary p-4 text-sm text-muted-foreground">
+                    None of this recipe&rsquo;s ingredients match the pantry items we&rsquo;re currently tracking.
+                  </p>
+                )}
+
+                <Button
+                  onClick={confirmConsumption}
+                  className="mt-6 h-14 w-full rounded-full text-base font-semibold"
+                >
+                  Looks right — update my kitchen
+                </Button>
+                <Button
+                  variant="ghost"
+                  onClick={() => navigate({ to: "/recipes" })}
+                  className="mt-2 h-12 w-full rounded-full"
+                >
+                  Skip update
+                </Button>
+              </section>
+            </>
+          ) : (
+            <>
+              <div className="mt-10 text-center">
+                <div className="mx-auto flex size-16 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-lift">
+                  <Sparkles className="size-8" aria-hidden />
+                </div>
+                <h1 className="mt-5 text-4xl">Kitchen updated.</h1>
+                <p className="mx-auto mt-3 max-w-lg text-base text-muted-foreground">
+                  You don&rsquo;t have to remember what changed. Pantry Talk carries the kitchen state into the next decision.
+                </p>
+              </div>
+
+              <section className="mt-8 rounded-3xl border border-primary/20 bg-card p-5 shadow-card sm:p-7">
+                <h2 className="text-xl">What&rsquo;s left</h2>
+                <ul className="mt-4 grid gap-3 sm:grid-cols-2">
+                  {consumptionDraft.map((used) => {
+                    const remaining = pantryItems.find((item) => item.id === used.pantryItemId);
+                    if (!remaining) return null;
+                    return (
+                      <li key={used.pantryItemId} className="rounded-2xl bg-secondary p-4">
+                        <p className="font-semibold">{remaining.name}</p>
+                        <p className="mt-1 text-sm text-muted-foreground">
+                          ~{formatPantryQuantity(remaining.quantityEstimate, remaining.unit)} remaining · {Math.round(remaining.confidence * 100)}% confidence
+                        </p>
+                      </li>
+                    );
+                  })}
+                </ul>
+
+                <div className="mt-6 rounded-2xl bg-accent p-4 text-accent-foreground">
+                  <p className="font-semibold">Pantry Talk closed the loop.</p>
+                  <p className="mt-1 text-sm">
+                    {consumptionDraft.length} tracked ingredient{consumptionDraft.length === 1 ? "" : "s"} updated from one cooking session.
+                  </p>
+                </div>
+
+                <Button
+                  onClick={() => navigate({ to: "/recipes" })}
+                  className="mt-6 h-14 w-full rounded-full text-base font-semibold"
+                >
+                  See what I can cook next
+                </Button>
+              </section>
+            </>
+          )}
+        </div>
       </main>
     );
   }
@@ -319,7 +486,7 @@ function CookingMode() {
           </Button>
           {last ? (
             <Button
-              onClick={() => navigate({ to: "/recipes" })}
+              onClick={finishCooking}
               className="h-20 rounded-3xl text-base font-semibold sm:text-lg"
             >
               <Check className="size-6" aria-hidden />

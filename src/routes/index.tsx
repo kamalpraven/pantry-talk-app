@@ -1,12 +1,14 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useState } from "react";
-import { Mic, Plus, X, Loader2, Sparkles, Square, Check } from "lucide-react";
+import { Mic, Plus, X, Loader2, Sparkles, Square, Check, PackageOpen, Clock3, Camera } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { usePantry } from "@/lib/pantry-store";
+import { formatPantryQuantity, type ScannedPantryItem } from "@/lib/inventory";
 import { ASSUMED_STAPLES, DIET_GOALS, MEAL_PREFERENCES, TIME_LIMITS } from "@/lib/recipes";
 import { parseIngredients, startRecording, transcribeAudio, type Recorder } from "@/lib/speech";
 import { interpretPreferences, parsePreferencesLocally } from "@/lib/preferences.functions";
+import { trackEvent } from "@/lib/analytics";
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -45,17 +47,22 @@ function IngredientInput() {
     goals,
     toggleGoal,
     setGoals,
+    pantryItems,
+    loadDemoKitchen,
+    loadScannedKitchen,
   } = usePantry();
 
   const [manual, setManual] = useState("");
   const [ingredientPhase, setIngredientPhase] = useState<Phase>("idle");
   const [moodPhase, setMoodPhase] = useState<Phase>("idle");
+  const [scanPhase, setScanPhase] = useState<"idle" | "working">("idle");
   const [recorder, setRecorder] = useState<Recorder | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [scanError, setScanError] = useState<string | null>(null);
   const [heardMood, setHeardMood] = useState<string | null>(null);
   const navigate = useNavigate();
 
-  const busy = ingredientPhase !== "idle" || moodPhase !== "idle";
+  const busy = ingredientPhase !== "idle" || moodPhase !== "idle" || scanPhase !== "idle";
 
   async function record(
     setPhase: (phase: Phase) => void,
@@ -112,6 +119,30 @@ function IngredientInput() {
       setPreference(parsed.preference);
     });
 
+  async function handleKitchenPhoto(file: File) {
+    setScanError(null);
+    setError(null);
+    setScanPhase("working");
+    trackEvent("pantry_scan_started");
+    try {
+      const form = new FormData();
+      form.append("image", file);
+      const response = await fetch("/api/scan-pantry", { method: "POST", body: form });
+      if (!response.ok) {
+        const message = await response.text().catch(() => "");
+        throw new Error(message || "I couldn't read that kitchen photo.");
+      }
+      const payload = (await response.json()) as { items?: ScannedPantryItem[] };
+      if (!payload.items?.length) throw new Error("No clear foods were detected. Try a closer photo.");
+      loadScannedKitchen(payload.items);
+      trackEvent("pantry_scan_completed", { itemCount: payload.items.length });
+    } catch (err) {
+      setScanError(err instanceof Error ? err.message : "I couldn't read that kitchen photo.");
+    } finally {
+      setScanPhase("idle");
+    }
+  }
+
   return (
     <main className="mx-auto flex min-h-screen w-full max-w-2xl flex-col justify-center px-5 pt-24 pb-16 sm:px-8">
       <header className="text-center">
@@ -151,6 +182,38 @@ function IngredientInput() {
         {error && (
           <p role="status" className="mt-3 max-w-sm text-center text-sm font-medium text-primary">
             {error}
+          </p>
+        )}
+
+        <div className="mt-6 flex w-full max-w-md items-center gap-3">
+          <div className="h-px flex-1 bg-border" />
+          <span className="text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground">or</span>
+          <div className="h-px flex-1 bg-border" />
+        </div>
+
+        <label className={`mt-5 inline-flex min-h-12 cursor-pointer items-center justify-center gap-2 rounded-full border border-primary/30 bg-card px-5 text-sm font-semibold text-foreground shadow-card transition-colors hover:bg-accent ${scanPhase === "working" ? "pointer-events-none opacity-70" : ""}`}>
+          {scanPhase === "working" ? (
+            <Loader2 className="size-4 animate-spin text-primary" aria-hidden />
+          ) : (
+            <Camera className="size-4 text-primary" aria-hidden />
+          )}
+          {scanPhase === "working" ? "Reading your kitchen…" : "Take a fridge or grocery photo"}
+          <input
+            type="file"
+            accept="image/jpeg,image/png,image/webp"
+            capture="environment"
+            className="sr-only"
+            disabled={scanPhase === "working"}
+            onChange={(event) => {
+              const file = event.currentTarget.files?.[0];
+              event.currentTarget.value = "";
+              if (file) void handleKitchenPhoto(file);
+            }}
+          />
+        </label>
+        {scanError && (
+          <p role="status" className="mt-3 max-w-md text-center text-sm font-medium text-primary">
+            {scanError}
           </p>
         )}
       </div>
@@ -204,6 +267,65 @@ function IngredientInput() {
             <Plus className="size-5" />
           </Button>
         </form>
+
+        <div className="mt-3 flex items-center justify-between gap-3 rounded-2xl border border-dashed border-primary/35 bg-primary/5 p-4">
+          <div>
+            <p className="flex items-center gap-2 text-sm font-semibold">
+              <PackageOpen className="size-4 text-primary" aria-hidden />
+              Demo shortcut
+            </p>
+            <p className="mt-1 text-sm text-muted-foreground">
+              Load a realistic kitchen with quantities, confidence and use-soon signals.
+            </p>
+          </div>
+          <Button
+            type="button"
+            variant="outline"
+            onClick={() => {
+              loadDemoKitchen();
+              trackEvent("pantry_demo_loaded", { itemCount: 8 });
+            }}
+            className="shrink-0 rounded-full"
+          >
+            Load kitchen
+          </Button>
+        </div>
+
+        {pantryItems.length > 0 && (
+          <div className="mt-6">
+            <div className="flex items-end justify-between gap-4">
+              <div>
+                <p className="text-sm font-semibold tracking-wide text-foreground uppercase">Kitchen state</p>
+                <p className="mt-1 text-sm text-muted-foreground">
+                  Pantry Talk keeps an estimate instead of asking for a perfect inventory.
+                </p>
+              </div>
+              <span className="rounded-full bg-accent px-3 py-1 text-xs font-semibold text-accent-foreground">
+                {pantryItems.length} tracked
+              </span>
+            </div>
+            <ul className="mt-4 grid gap-2 sm:grid-cols-2">
+              {pantryItems.slice(0, 8).map((item) => (
+                <li key={item.id} className="rounded-2xl border border-border bg-background/70 p-3">
+                  <div className="flex items-start justify-between gap-3">
+                    <div>
+                      <p className="font-semibold">{item.name}</p>
+                      <p className="mt-1 text-sm text-muted-foreground">
+                        ~{formatPantryQuantity(item.quantityEstimate, item.unit)} · {Math.round(item.confidence * 100)}% confidence
+                      </p>
+                    </div>
+                    {item.useSoonDays != null && item.useSoonDays <= 3 && (
+                      <span className="inline-flex items-center gap-1 rounded-full bg-secondary px-2 py-1 text-xs font-semibold text-primary">
+                        <Clock3 className="size-3" aria-hidden />
+                        use soon
+                      </span>
+                    )}
+                  </div>
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
 
         <div className="mt-6 rounded-2xl bg-secondary p-4">
           <p className="flex items-center gap-2 text-sm font-semibold">
@@ -339,7 +461,10 @@ function IngredientInput() {
       <Button
         size="lg"
         disabled={ingredients.length === 0 || busy}
-        onClick={() => navigate({ to: "/recipes" })}
+        onClick={() => {
+          trackEvent("meal_plan_requested", { ingredientCount: ingredients.length });
+          navigate({ to: "/recipes" });
+        }}
         className="mt-10 h-16 w-full rounded-full text-lg font-semibold shadow-lift"
       >
         Find recipes

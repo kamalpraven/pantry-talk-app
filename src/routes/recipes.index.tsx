@@ -16,9 +16,10 @@ import {
 import { Button } from "@/components/ui/button";
 import { RecipeImage } from "@/components/RecipeImage";
 import { usePantry } from "@/lib/pantry-store";
-import { findRecipes, readinessLabel, substituteLabel, RECIPES } from "@/lib/recipes";
+import { findRecipes, normalize, readinessLabel, substituteLabel, RECIPES } from "@/lib/recipes";
 import { discoverRecipes } from "@/lib/linkup.functions";
 import { cacheRecipes } from "@/lib/recipe-cache";
+import { trackEvent } from "@/lib/analytics";
 
 export const Route = createFileRoute("/recipes/")({
   head: () => ({
@@ -27,13 +28,13 @@ export const Route = createFileRoute("/recipes/")({
       {
         name: "description",
         content:
-          "Five dishes matched to the ingredients in your kitchen, with cooking time, calories, protein, pantry match and what's missing.",
+          "Three dishes matched to the ingredients in your kitchen, with cooking time, calories, protein, pantry match and what's missing.",
       },
       { property: "og:title", content: "Your recipe matches — PantryTalk" },
       {
         property: "og:description",
         content:
-          "Five dishes matched to the ingredients in your kitchen, with cooking time, calories, protein, pantry match and what's missing.",
+          "Three dishes matched to the ingredients in your kitchen, with cooking time, calories, protein, pantry match and what's missing.",
       },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary_large_image" },
@@ -43,7 +44,7 @@ export const Route = createFileRoute("/recipes/")({
 });
 
 function RecipeResults() {
-  const { ingredients, filters, timeLimit, goals, preference } = usePantry();
+  const { ingredients, pantryItems, filters, timeLimit, goals, preference } = usePantry();
   const search = useServerFn(discoverRecipes);
 
   const { data, isFetching } = useQuery({
@@ -59,11 +60,20 @@ function RecipeResults() {
   // Show good matches from the built-in dishes straight away, then swap in
   // the live web results the moment they arrive.
   const pool = usingFallback ? RECIPES : live;
-  const matches = findRecipes(ingredients, filters, pool).slice(0, 5);
+  const matches = findRecipes(ingredients, filters, pool).slice(0, 3);
 
   useEffect(() => {
     if (pool.length) cacheRecipes(pool);
   }, [pool]);
+
+  useEffect(() => {
+    if (!isFetching && matches.length > 0) {
+      trackEvent("meal_plan_generated", {
+        resultCount: matches.length,
+        liveSearch: !usingFallback,
+      });
+    }
+  }, [isFetching, matches.length, usingFallback]);
 
   return (
     <main className="mx-auto w-full max-w-3xl px-5 pt-24 pb-20 sm:px-8">
@@ -75,7 +85,7 @@ function RecipeResults() {
         Edit ingredients
       </Link>
 
-      <h1 className="mt-5 text-3xl sm:text-4xl">Five things worth cooking</h1>
+      <h1 className="mt-5 text-3xl sm:text-4xl">Three dinners worth cooking</h1>
       <p className="mt-3 text-base text-muted-foreground">
         Based on {ingredients.length ? ingredients.join(" · ") : "your pantry"} — {timeLimit.toLowerCase()}
         {goals.length ? `, ${goals.join(", ").toLowerCase()}` : ""}.
@@ -107,6 +117,12 @@ function RecipeResults() {
       <ul className="mt-8 space-y-8">
         {matches.map(({ recipe, used, missing, matchPercent, substitutions, labels, reason }) => {
           const ready = missing.length === 0;
+          const useSoon = pantryItems.filter(
+            (item) =>
+              item.useSoonDays != null &&
+              item.useSoonDays <= 3 &&
+              used.some((ingredient) => normalize(ingredient) === normalize(item.name)),
+          );
           return (
             <li
               key={recipe.id}
@@ -155,6 +171,11 @@ function RecipeResults() {
                   <span className="text-sm font-semibold text-primary">
                     {matchPercent}% pantry match
                   </span>
+                  {useSoon.length > 0 && (
+                    <span className="rounded-full bg-primary px-3 py-1.5 text-sm font-semibold text-primary-foreground">
+                      Uses {useSoon[0]?.name} soon
+                    </span>
+                  )}
                   {substitutions.length > 0 && (
                     <span className="inline-flex items-center gap-1.5 rounded-full bg-secondary px-3 py-1.5 text-sm font-semibold text-secondary-foreground">
                       <Repeat2 className="size-4" aria-hidden />
@@ -203,7 +224,11 @@ function RecipeResults() {
                 </dl>
 
                 <Button asChild size="lg" className="mt-6 h-14 w-full rounded-full text-base">
-                  <Link to="/recipes/$recipeId" params={{ recipeId: recipe.id }}>
+                  <Link
+                    to="/recipes/$recipeId"
+                    params={{ recipeId: recipe.id }}
+                    onClick={() => trackEvent("meal_selected", { recipeId: recipe.id, matchPercent })}
+                  >
                     Cook this
                   </Link>
                 </Button>

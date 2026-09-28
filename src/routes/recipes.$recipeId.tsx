@@ -6,6 +6,7 @@ import { GroceryFinder } from "@/components/GroceryFinder";
 import { usePantry } from "@/lib/pantry-store";
 import { matchRecipe, readinessLabel } from "@/lib/recipes";
 import { lookupRecipe } from "@/lib/recipe-cache";
+import { trackEvent } from "@/lib/analytics";
 
 export const Route = createFileRoute("/recipes/$recipeId")({
   head: () => ({
@@ -195,7 +196,11 @@ function RecipeDetail() {
           </section>
 
           <Button asChild size="lg" className="mt-10 h-16 w-full rounded-full text-lg font-semibold">
-            <Link to="/cook/$recipeId" params={{ recipeId: recipe.id }}>
+            <Link
+              to="/cook/$recipeId"
+              params={{ recipeId: recipe.id }}
+              onClick={() => trackEvent("cook_mode_started", { recipeId: recipe.id })}
+            >
               Start cooking
             </Link>
           </Button>

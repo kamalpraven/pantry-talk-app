@@ -9,7 +9,7 @@ function displaySrc(raw: string): string {
     : raw;
 }
 
-function RecipePlaceholder({ recipe, className }: { recipe: Recipe; className?: string }) {
+function RecipePlaceholder({ recipe, className }: { recipe: Recipe; className?: string | undefined }) {
   return (
     <div
       className={`relative flex items-center justify-center overflow-hidden bg-gradient-to-br from-secondary via-background to-accent ${className ?? ""}`}

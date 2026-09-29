@@ -260,6 +260,8 @@ export type RecipeFilters = {
   goals: DietGoal[];
 };
 
+export const MAKE_NOW_MATCH_THRESHOLD = 70;
+
 export type RecipeMatch = {
   recipe: Recipe;
   used: string[];
@@ -354,20 +356,22 @@ export function findRecipes(
   const cookability = (m: RecipeMatch) =>
     m.missing.length === 0 ? 3 : m.missing.length <= 1 ? 2 : m.missing.length <= 2 ? 1 : 0;
 
-  return matches.sort((a, b) => {
-    if (a.fitsTime !== b.fitsTime) return a.fitsTime ? -1 : 1;
-    if (cookability(b) !== cookability(a)) return cookability(b) - cookability(a);
-    if (goalScore(b) !== goalScore(a)) return goalScore(b) - goalScore(a);
-    if (filters.goals.includes("High Protein")) {
-      const p = b.recipe.nutrition.protein - a.recipe.nutrition.protein;
-      if (p !== 0) return p;
-    }
-    const prefScore = (m: RecipeMatch) =>
-      filters.preference === "Anything" ? 0 : m.recipe.tags.includes(filters.preference) ? 1 : 0;
-    if (prefScore(b) !== prefScore(a)) return prefScore(b) - prefScore(a);
-    if (b.matchPercent !== a.matchPercent) return b.matchPercent - a.matchPercent;
-    return a.recipe.timeMinutes - b.recipe.timeMinutes;
-  });
+  return matches
+    .filter((match) => match.matchPercent >= MAKE_NOW_MATCH_THRESHOLD)
+    .sort((a, b) => {
+      if (b.matchPercent !== a.matchPercent) return b.matchPercent - a.matchPercent;
+      if (a.fitsTime !== b.fitsTime) return a.fitsTime ? -1 : 1;
+      if (cookability(b) !== cookability(a)) return cookability(b) - cookability(a);
+      if (goalScore(b) !== goalScore(a)) return goalScore(b) - goalScore(a);
+      if (filters.goals.includes("High Protein")) {
+        const p = b.recipe.nutrition.protein - a.recipe.nutrition.protein;
+        if (p !== 0) return p;
+      }
+      const prefScore = (m: RecipeMatch) =>
+        filters.preference === "Anything" ? 0 : m.recipe.tags.includes(filters.preference) ? 1 : 0;
+      if (prefScore(b) !== prefScore(a)) return prefScore(b) - prefScore(a);
+      return a.recipe.timeMinutes - b.recipe.timeMinutes;
+    });
 }
 
 export function getRecipe(id: string) {

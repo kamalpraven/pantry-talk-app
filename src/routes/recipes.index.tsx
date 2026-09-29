@@ -86,7 +86,7 @@ function RecipeResults() {
         Edit ingredients
       </Link>
 
-      <h1 className="mt-5 text-3xl sm:text-4xl">Three dinners worth cooking</h1>
+      <h1 className="mt-5 text-3xl sm:text-4xl">Make Now recommendations</h1>
       <p className="mt-3 text-base text-muted-foreground">
         Based on {ingredients.length ? ingredients.join(" · ") : "your pantry"} —{" "}
         {timeLimit.toLowerCase()}
@@ -108,7 +108,8 @@ function RecipeResults() {
           className="mt-6 rounded-2xl bg-secondary p-4 text-base text-muted-foreground"
           role="status"
         >
-          Live recipe search is unavailable, so here are some suggestions based on your ingredients.
+          Live recipe search is unavailable, so I&rsquo;m checking your saved PantryTalk recipe set
+          instead.
         </p>
       )}
 
@@ -264,9 +265,19 @@ function RecipeResults() {
       </ul>
 
       {!isFetching && matches.length === 0 && (
-        <p className="mt-8 text-base text-muted-foreground">
-          Add a few ingredients and I&rsquo;ll find something to cook.
-        </p>
+        <div className="mt-8 rounded-3xl border border-dashed border-primary/30 bg-card p-6 text-center shadow-card">
+          <p className="text-xl font-semibold">
+            {ingredients.length
+              ? "No Make Now matches yet."
+              : "Add a few ingredients and I&rsquo;ll find something to cook."}
+          </p>
+          {ingredients.length > 0 && (
+            <p className="mx-auto mt-2 max-w-md text-base text-muted-foreground">
+              I only show recipes when your pantry covers at least 70% of the key ingredients. Add
+              another ingredient or adjust your kitchen to unlock stronger matches.
+            </p>
+          )}
+        </div>
       )}
     </main>
   );

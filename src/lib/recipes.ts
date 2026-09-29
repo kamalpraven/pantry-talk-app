@@ -351,16 +351,16 @@ export function findRecipes(
   const goalScore = (m: RecipeMatch) =>
     filters.goals.filter((g) => m.recipe.dietaryTags.includes(g)).length;
 
-  // Cookability comes first: a dish you can nearly make beats a slightly
-  // higher-protein dish that needs a shopping trip.
+  // Time fit comes first, then pantry match; cookability and the remaining
+  // signals break ties after the user's explicit time constraint is honored.
   const cookability = (m: RecipeMatch) =>
     m.missing.length === 0 ? 3 : m.missing.length <= 1 ? 2 : m.missing.length <= 2 ? 1 : 0;
 
   return matches
     .filter((match) => match.matchPercent >= MAKE_NOW_MATCH_THRESHOLD)
     .sort((a, b) => {
-      if (b.matchPercent !== a.matchPercent) return b.matchPercent - a.matchPercent;
       if (a.fitsTime !== b.fitsTime) return a.fitsTime ? -1 : 1;
+      if (b.matchPercent !== a.matchPercent) return b.matchPercent - a.matchPercent;
       if (cookability(b) !== cookability(a)) return cookability(b) - cookability(a);
       if (goalScore(b) !== goalScore(a)) return goalScore(b) - goalScore(a);
       if (filters.goals.includes("High Protein")) {

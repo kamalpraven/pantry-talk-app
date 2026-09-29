@@ -52,4 +52,21 @@ describe("findRecipes Make Now threshold", () => {
     expect(matches.map((match) => match.recipe.id)).toEqual(["hundred", "eighty", "seventy"]);
     expect(matches.map((match) => match.matchPercent)).toEqual([100, 80, 70]);
   });
+
+  it("ranks recipes that satisfy an Under 30 time limit above higher pantry matches that do not", () => {
+    const matches = findRecipes(
+      ["a", "b", "c", "d", "e", "f", "g", "h", "i", "p", "q", "r"],
+      { ...filters, timeLimit: "Under 30 min" },
+      [
+        recipe("twenty-minute-ninety", ["a", "b", "c", "d", "e", "f", "g", "h", "i", "x"], 20),
+        recipe("sixty-minute-hundred", ["p", "q", "r"], 60),
+      ],
+    );
+
+    expect(matches.map((match) => match.recipe.id)).toEqual([
+      "twenty-minute-ninety",
+      "sixty-minute-hundred",
+    ]);
+    expect(matches.map((match) => match.matchPercent)).toEqual([90, 100]);
+  });
 });
